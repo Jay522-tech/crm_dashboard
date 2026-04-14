@@ -21,9 +21,12 @@ exports.register = async (req, res) => {
             if (invitation && invitation.status === 'PENDING' && (!invitation.expiresAt || invitation.expiresAt.getTime() >= Date.now())) {
                 const workspace = await Workspace.findById(invitation.workspace);
                 if (workspace) {
-                    const isMember = workspace.members.some((m) => String(m) === String(user._id));
+                    const isMember = workspace.members.some((m) => {
+                        const memberId = m.user?._id || m.user || m;
+                        return String(memberId) === String(user._id);
+                    });
                     if (!isMember) {
-                        workspace.members.push(user._id);
+                        workspace.members.push({ user: user._id, role: 'Member' });
                         await workspace.save();
                     }
                     user.workspaces.push(workspace._id);
@@ -39,7 +42,7 @@ exports.register = async (req, res) => {
             const workspace = await Workspace.create({
                 name: 'My Workspace',
                 owner: user._id,
-                members: [user._id]
+                members: [{ user: user._id, role: 'Super Admin' }]
             });
 
             user.workspaces.push(workspace._id);

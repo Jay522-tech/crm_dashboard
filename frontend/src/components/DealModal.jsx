@@ -8,9 +8,11 @@ import ContactModal from './ContactModal'
 const STAGES = ['Lead', 'Contacted', 'Qualified', 'Won', 'Lost']
 
 const DealModal = ({ dealId, onClose }) => {
-    const { deals, updateDeal, addNote, deleteDeal, workspaces, activeWorkspaceId } = useStore()
+    const { user, deals, updateDeal, addNote, deleteDeal, workspaces, activeWorkspaceId } = useStore()
     const deal = deals.find(d => d._id === dealId)
     const activeWorkspace = workspaces.find(w => w._id === activeWorkspaceId)
+    const currentUserRole = activeWorkspace?.members?.find(m => String(m.user?._id || m.user) === String(user?._id))?.role
+    const isAtLeastAdmin = currentUserRole === 'Super Admin' || currentUserRole === 'Admin'
 
     const contact = deal?.contact
     const dealNotes = deal?.notes ? [...deal.notes].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)) : []
@@ -144,9 +146,9 @@ const DealModal = ({ dealId, onClose }) => {
                                         className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-primary/20 outline-none transition-all cursor-pointer"
                                     >
                                         <option value="">Unassigned</option>
-                                        {activeWorkspace?.members?.map(member => (
-                                            <option key={member._id} value={member._id}>
-                                                {member.name}
+                                        {activeWorkspace?.members?.map(m => (
+                                            <option key={m.user?._id || m.user} value={m.user?._id || m.user}>
+                                                {m.user?.name || m.name}
                                             </option>
                                         ))}
                                     </select>
@@ -201,15 +203,17 @@ const DealModal = ({ dealId, onClose }) => {
                             )}
                         </section>
 
-                        <div className="pt-8">
-                            <button
-                                onClick={() => setIsConfirmOpen(true)}
-                                className="w-full flex items-center justify-center gap-2 px-4 py-2 text-destructive border border-destructive/20 hover:bg-destructive/10 rounded-lg text-sm font-medium transition-all"
-                            >
-                                <Trash2 size={16} />
-                                Archive Deal
-                            </button>
-                        </div>
+                        {isAtLeastAdmin && (
+                            <div className="pt-8">
+                                <button
+                                    onClick={() => setIsConfirmOpen(true)}
+                                    className="w-full flex items-center justify-center gap-2 px-4 py-2 text-destructive border border-destructive/20 hover:bg-destructive/10 rounded-lg text-sm font-medium transition-all"
+                                >
+                                    <Trash2 size={16} />
+                                    Archive Deal
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

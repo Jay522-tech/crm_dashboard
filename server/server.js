@@ -36,6 +36,9 @@ app.use('/api/contacts', require('./routes/contactRoutes'));
 app.use('/api/events', require('./routes/eventRoutes'));
 app.use('/api/matters', require('./routes/matterRoutes'));
 app.use('/api/activities', require('./routes/activityRoutes'));
+app.use('/api/documents', require('./routes/documentRoutes'));
+app.use('/api/communications', require('./routes/communicationRoutes'));
+app.use('/api/reports', require('./routes/reportRoutes'));
 
 app.get('/', (req, res) => res.send('CRM API is running...'));
 

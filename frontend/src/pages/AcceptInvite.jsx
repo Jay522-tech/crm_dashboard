@@ -62,8 +62,11 @@ const AcceptInvite = () => {
                 const { data } = await api.get('/auth/me')
                 setUser(data)
             }
-            await api.post(`/workspaces/invitations/${encodeURIComponent(token)}/accept`)
+            const { data } = await api.post(`/workspaces/invitations/${encodeURIComponent(token)}/accept`)
             await fetchWorkspaces()
+            if (data.workspace?._id) {
+                useStore.setState({ activeWorkspaceId: data.workspace._id })
+            }
             toast.success('Joined workspace')
             navigate('/pipeline')
         } catch (err) {

@@ -7,7 +7,7 @@ const Modal = ({ isOpen, onClose, title, children }) => {
 
     return createPortal((
         <div
-            className="fixed inset-0 z-[2147483647] bg-black/35 backdrop-blur-sm animate-in fade-in duration-200"
+            className="fixed inset-0 z-50 bg-black/35 backdrop-blur-sm animate-in fade-in duration-200"
             role="dialog"
             aria-modal="true"
             onMouseDown={(e) => {

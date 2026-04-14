@@ -18,7 +18,8 @@ exports.createDeal = async (req, res) => {
             message: `Created deal “${deal.title}”`,
         });
 
-        res.status(201).json(deal);
+        const populatedDeal = await Deal.findById(deal._id).populate('assignee', 'name email');
+        res.status(201).json(populatedDeal);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -36,7 +37,7 @@ exports.getDealsByWorkspace = async (req, res) => {
 exports.updateDeal = async (req, res) => {
     try {
         const before = await Deal.findById(req.params.id);
-        const deal = await Deal.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const deal = await Deal.findByIdAndUpdate(req.params.id, req.body, { new: true }).populate('assignee', 'name email');
 
         if (deal) {
             const stageChanged = before && req.body.stage && before.stage !== req.body.stage;

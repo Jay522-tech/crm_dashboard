@@ -32,6 +32,12 @@ const Sidebar = ({ onNavigate }) => {
     const [isWorkspaceModalOpen, setIsWorkspaceModalOpen] = useState(false)
     const navigate = useNavigate()
 
+    // Get current user's role in the active workspace
+    const currentUserMember = activeWorkspace?.members?.find(
+        (m) => (m.user?._id || m.user) === user?._id
+    )
+    const isAdmin = currentUserMember?.role === 'Admin' || currentUserMember?.role === 'Super Admin'
+
     const handleNavigate = () => {
         if (typeof onNavigate === 'function') onNavigate()
     }
@@ -63,6 +69,7 @@ const Sidebar = ({ onNavigate }) => {
                         <NavRow icon={<CheckSquare size={18} />} label="Pipeline" to="/pipeline" onNavigate={handleNavigate} />
                         <NavRow icon={<Scale size={18} />} label="Matters" to="/matters" onNavigate={handleNavigate} />
                         <NavRow icon={<Users size={18} />} label="Contacts" to="/contacts" onNavigate={handleNavigate} />
+                        <NavRow icon={<Users size={18} />} label="Team" to="/team" onNavigate={handleNavigate} />
                         <NavRow icon={<Activity size={18} />} label="Activities" to="/activities" onNavigate={handleNavigate} />
                     </div>
                 </div>
@@ -73,10 +80,21 @@ const Sidebar = ({ onNavigate }) => {
                     </h3>
                     <div className="space-y-0.5">
                         <NavRow icon={<Briefcase size={18} />} label="All deals" to="/deals" onNavigate={handleNavigate} />
-                        <NavRow icon={<CreditCard size={18} />} label="Billing" to="/billing" onNavigate={handleNavigate} />
                         <NavRow icon={<FileText size={18} />} label="Documents" to="/documents" onNavigate={handleNavigate} />
-                        <NavRow icon={<MessageSquare size={18} />} label="Communications" to="/communications" onNavigate={handleNavigate} />
+                        {isAdmin && (
+                            <NavRow icon={<MessageSquare size={18} />} label="Communications" to="/communications" onNavigate={handleNavigate} />
+                        )}
                         <NavRow icon={<BarChart3 size={18} />} label="Reports" to="/reports" onNavigate={handleNavigate} />
+
+                        <button
+                            type="button"
+                            onClick={() => setIsWorkspaceModalOpen(true)}
+                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold text-primary hover:bg-primary/5 transition-colors mt-2 mb-1"
+                        >
+                            <Plus size={17} strokeWidth={2.25} />
+                            New workspace
+                        </button>
+
                         {workspaces.map((w) => (
                             <button
                                 key={w._id}
@@ -97,38 +115,10 @@ const Sidebar = ({ onNavigate }) => {
                                 <span className="truncate">{w.name}</span>
                             </button>
                         ))}
-                        <button
-                            type="button"
-                            onClick={() => setIsWorkspaceModalOpen(true)}
-                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold text-primary hover:bg-primary/5 transition-colors mt-1"
-                        >
-                            <Plus size={17} strokeWidth={2.25} />
-                            New workspace
-                        </button>
                     </div>
                 </div>
             </nav>
 
-            <div className="px-3 pb-3">
-                <div className="rounded-xl border border-slate-200/90 bg-gradient-to-br from-slate-50 to-violet-50/50 p-3.5 shadow-sm">
-                    <div className="flex items-start gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-md shrink-0">
-                            <Sparkles size={18} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-slate-900">Upgrade plan</span>
-                                <span className="rounded-md bg-violet-600 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
-                                    Pro
-                                </span>
-                            </div>
-                            <p className="text-[11px] text-slate-600 mt-1 leading-snug">
-                                Unlock advanced reporting and team seats.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
             <div className="mt-auto border-t border-slate-200/80 p-3 space-y-1">
                 <NavRow icon={<Settings size={18} />} label="Settings" to="/settings" onNavigate={handleNavigate} />

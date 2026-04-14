@@ -10,8 +10,14 @@ const useStore = create((set, get) => ({
     events: [],
     matters: [],
     activities: [],
+    documents: [],
+    templates: [],
+    communicationHistory: [],
+    reportStats: null,
+    reportLoading: false,
     dashboardStats: null,
     dashboardLoading: false,
+    pendingInvitations: [],
     isLoading: false,
 
     setUser: (user) => set({ user }),
@@ -37,17 +43,44 @@ const useStore = create((set, get) => ({
 
     inviteMemberToWorkspace: async (workspaceId, email) => {
         const { data } = await api.post(`/workspaces/${workspaceId}/invite`, { email });
-        // If member was added immediately, refresh list for latest members.
-        if (data?.mode === 'added_existing_user') {
-            await get().fetchWorkspaces();
-        }
+        // Refresh to get updated members
+        await get().fetchWorkspaces();
+        await get().fetchPendingInvitations(workspaceId);
         return data;
+    },
+
+    updateMemberRole: async (workspaceId, userId, role) => {
+        const { data } = await api.put(`/workspaces/${workspaceId}/members/${userId}/role`, { role });
+        set((state) => ({
+            workspaces: state.workspaces.map((w) => w._id === workspaceId ? data : w)
+        }));
+    },
+
+    removeMemberFromWorkspace: async (workspaceId, userId) => {
+        const { data } = await api.delete(`/workspaces/${workspaceId}/members/${userId}`);
+        set((state) => ({
+            workspaces: state.workspaces.map((w) => w._id === workspaceId ? data : w)
+        }));
+    },
+
+    fetchPendingInvitations: async (workspaceId = get().activeWorkspaceId) => {
+        if (!workspaceId) return;
+        try {
+            const { data } = await api.get(`/workspaces/${workspaceId}/invitations`);
+            set({ pendingInvitations: data });
+        } catch (error) {
+            console.error(error);
+        }
     },
 
     setActiveWorkspace: (id) => {
         set({ activeWorkspaceId: id });
         get().fetchDeals(id);
         get().fetchDashboardStats(id);
+        get().fetchDocuments(id);
+        get().fetchTemplates(id);
+        get().fetchCommunicationHistory(id);
+        get().fetchPendingInvitations(id);
     },
 
     fetchDeals: async (workspaceId) => {
@@ -248,6 +281,101 @@ const useStore = create((set, get) => ({
             get().fetchDashboardStats();
         } catch (error) {
             console.error(error);
+        }
+    },
+
+    fetchDocuments: async (workspaceId = get().activeWorkspaceId) => {
+        if (!workspaceId) return;
+        try {
+            const { data } = await api.get(`/documents/workspace/${workspaceId}`);
+            set({ documents: data });
+        } catch (error) {
+            console.error(error);
+        }
+    },
+
+    uploadDocument: async (formData) => {
+        try {
+            const { data } = await api.post('/documents/upload', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            set((state) => ({ documents: [data, ...state.documents] }));
+            return data;
+        } catch (error) {
+            console.error(error);
+            throw error;
+        }
+    },
+
+    deleteDocument: async (documentId) => {
+        try {
+            await api.delete(`/documents/${documentId}`);
+            set((state) => ({ documents: state.documents.filter((d) => d._id !== documentId) }));
+        } catch (error) {
+            console.error(error);
+        }
+    },
+
+    // --- Communications & Templates ---
+    fetchTemplates: async (workspaceId = get().activeWorkspaceId) => {
+        if (!workspaceId) return;
+        try {
+            const { data } = await api.get(`/communications/templates/workspace/${workspaceId}`);
+            set({ templates: data });
+        } catch (error) {
+            console.error(error);
+        }
+    },
+
+    createTemplate: async (payload) => {
+        try {
+            const { data } = await api.post('/communications/templates', {
+                ...payload,
+                workspaceId: get().activeWorkspaceId
+            });
+            set((state) => ({ templates: [data, ...state.templates] }));
+            return data;
+        } catch (error) {
+            console.error(error);
+            throw error;
+        }
+    },
+
+    fetchCommunicationHistory: async (workspaceId = get().activeWorkspaceId) => {
+        if (!workspaceId) return;
+        try {
+            const { data } = await api.get(`/communications/workspace/${workspaceId}`);
+            set({ communicationHistory: data });
+        } catch (error) {
+            console.error(error);
+        }
+    },
+
+    logCommunication: async (payload) => {
+        try {
+            const { data } = await api.post('/communications/log', {
+                ...payload,
+                workspaceId: get().activeWorkspaceId
+            });
+            set((state) => ({ communicationHistory: [data, ...state.communicationHistory] }));
+            return data;
+        } catch (error) {
+            console.error(error);
+            throw error;
+        }
+    },
+
+    fetchReportStats: async (scope = 'workspace', workspaceId = get().activeWorkspaceId) => {
+        try {
+            set({ reportLoading: true });
+            const { data } = await api.get('/reports/stats', {
+                params: { scope, workspaceId }
+            });
+            set({ reportStats: data });
+        } catch (error) {
+            console.error(error);
+        } finally {
+            set({ reportLoading: false });
         }
     },
 

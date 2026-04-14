@@ -13,7 +13,11 @@ import DealCard from './DealCard'
 import { STAGES } from '../constants/kanbanConfig'
 
 const KanbanBoard = ({ onDealClick }) => {
-    const { deals, activeWorkspaceId, updateDealStage, addDeal, searchTerm } = useStore()
+    const { user, deals, activeWorkspaceId, updateDealStage, addDeal, searchTerm, workspaces } = useStore()
+    const activeWorkspace = workspaces.find(w => w._id === activeWorkspaceId)
+    const currentUserRole = activeWorkspace?.members?.find(m => String(m.user?._id || m.user) === String(user?._id))?.role
+    const isAtLeastAdmin = currentUserRole === 'Super Admin' || currentUserRole === 'Admin'
+
     const workspaceDeals = deals.filter(d =>
         d.workspace === activeWorkspaceId &&
         d.title.toLowerCase().includes(searchTerm.toLowerCase())
@@ -30,10 +34,12 @@ const KanbanBoard = ({ onDealClick }) => {
     )
 
     const handleDragStart = (event) => {
+        if (!isAtLeastAdmin) return
         setActiveId(event.active.id)
     }
 
     const handleDragOver = (event) => {
+        if (!isAtLeastAdmin) return
         const { active, over } = event
         if (!over) return
 
@@ -69,7 +75,7 @@ const KanbanBoard = ({ onDealClick }) => {
             onDragEnd={handleDragEnd}
         >
             <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
-                <div className="flex min-h-0 flex-1 gap-5 overflow-x-auto pb-1">
+                <div className="flex min-h-0 flex-1 gap-5 overflow-x-auto pb-1 no-scrollbar">
                     {STAGES.map((stage) => (
                         <KanbanColumn
                             key={stage}
@@ -77,7 +83,8 @@ const KanbanBoard = ({ onDealClick }) => {
                             title={stage}
                             deals={workspaceDeals.filter((d) => d.stage === stage)}
                             onDealClick={onDealClick}
-                            onAddDeal={() => addDeal({ title: 'New Deal', stage, amount: 0 })}
+                            onAddDeal={isAtLeastAdmin ? () => addDeal({ title: 'New Deal', stage, amount: 0 }) : null}
+                            isAtLeastAdmin={isAtLeastAdmin}
                         />
                     ))}
                 </div>

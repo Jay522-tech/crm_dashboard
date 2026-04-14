@@ -5,7 +5,7 @@ import DealCard from './DealCard'
 import { Plus, MoreHorizontal, CircleDot } from 'lucide-react'
 import { STAGE_THEME } from '../constants/kanbanConfig'
 
-const KanbanColumn = ({ id, title, deals, onDealClick, onAddDeal }) => {
+const KanbanColumn = ({ id, title, deals, onDealClick, onAddDeal, isAtLeastAdmin }) => {
     const { setNodeRef, isOver } = useDroppable({ id })
     const theme = STAGE_THEME[id] || STAGE_THEME.Lead
 
@@ -36,14 +36,16 @@ const KanbanColumn = ({ id, title, deals, onDealClick, onAddDeal }) => {
                     <span className="text-xs font-semibold tabular-nums text-slate-600 bg-white/90 px-2 py-0.5 rounded-full border border-slate-200/90 shadow-sm">
                         {deals.length}
                     </span>
-                    <button
-                        type="button"
-                        onClick={onAddDeal}
-                        className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-white/90 transition-colors"
-                        title="Add deal"
-                    >
-                        <Plus size={17} strokeWidth={2} />
-                    </button>
+                    {isAtLeastAdmin && (
+                        <button
+                            type="button"
+                            onClick={onAddDeal}
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-white/90 transition-colors"
+                            title="Add deal"
+                        >
+                            <Plus size={17} strokeWidth={2} />
+                        </button>
+                    )}
                     <button
                         type="button"
                         className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-white/90 transition-colors"
@@ -74,15 +76,17 @@ const KanbanColumn = ({ id, title, deals, onDealClick, onAddDeal }) => {
                 )}
             </div>
 
-            <div className="p-2.5 pt-0 border-t border-slate-100/90 bg-white">
-                <button
-                    type="button"
-                    onClick={onAddDeal}
-                    className="w-full py-2.5 rounded-lg text-sm font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-transparent hover:border-slate-200/80 transition-all"
-                >
-                    + Add deal
-                </button>
-            </div>
+            {isAtLeastAdmin && (
+                <div className="p-2.5 pt-0 border-t border-slate-100/90 bg-white">
+                    <button
+                        type="button"
+                        onClick={onAddDeal}
+                        className="w-full py-2.5 rounded-lg text-sm font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-transparent hover:border-slate-200/80 transition-all"
+                    >
+                        + Add deal
+                    </button>
+                </div>
+            )}
         </div>
     )
 }

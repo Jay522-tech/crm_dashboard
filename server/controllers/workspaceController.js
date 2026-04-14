@@ -22,12 +22,20 @@ const acceptInvitationForUser = async ({ invitation, user }) => {
     }
 
     const userId = user._id || user.id;
+    console.log(`[AcceptInvite] Attempting to add user ${userId} to workspace ${workspace._id}`);
 
     // Ensure user is not already a member
-    const isAlreadyMember = workspace.members.some((m) => String(m) === String(userId));
+    const isAlreadyMember = workspace.members.some((m) => {
+        const memberId = m.user?._id || m.user || m;
+        return String(memberId) === String(userId);
+    });
+
     if (!isAlreadyMember) {
-        workspace.members.push(userId);
+        workspace.members.push({ user: userId, role: 'Member' });
         await workspace.save();
+        console.log(`[AcceptInvite] User ${userId} added to workspace ${workspace._id}`);
+    } else {
+        console.log(`[AcceptInvite] User ${userId} already member of ${workspace._id}`);
     }
 
     await User.findByIdAndUpdate(userId, { $addToSet: { workspaces: workspace._id } });
@@ -45,7 +53,7 @@ exports.createWorkspace = async (req, res) => {
         const workspace = await Workspace.create({
             name: req.body.name,
             owner: req.user.id,
-            members: [req.user.id]
+            members: [{ user: req.user.id, role: 'Super Admin' }]
         });
 
         await User.findByIdAndUpdate(req.user.id, { $push: { workspaces: workspace._id } });
@@ -68,7 +76,9 @@ exports.createWorkspace = async (req, res) => {
 
 exports.getWorkspaces = async (req, res) => {
     try {
-        const workspaces = await Workspace.find({ members: req.user.id }).populate('owner members', 'name email');
+        const workspaces = await Workspace.find({ "members.user": req.user.id })
+            .populate('owner', 'name email')
+            .populate('members.user', 'name email');
         res.json(workspaces);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -86,14 +96,20 @@ exports.inviteMember = async (req, res) => {
 
         const existingUser = await User.findOne({ email });
         if (existingUser) {
-            if (workspace.members.includes(existingUser._id)) {
+            console.log(`[InviteMember] User ${existingUser._id} exists, adding directly.`);
+            const isAlreadyMember = workspace.members.some(m => {
+                const memberId = m.user?._id || m.user || m;
+                return String(memberId) === String(existingUser._id);
+            });
+
+            if (isAlreadyMember) {
                 return res.status(400).json({ message: 'User already a member' });
             }
 
-            workspace.members.push(existingUser._id);
+            workspace.members.push({ user: existingUser._id, role: 'Member' });
             await workspace.save();
-
             await User.findByIdAndUpdate(existingUser._id, { $addToSet: { workspaces: workspace._id } });
+            console.log(`[InviteMember] Added existing user ${existingUser._id} to workspace.`);
 
             await logActivity({
                 workspace: workspace._id,
@@ -111,6 +127,18 @@ exports.inviteMember = async (req, res) => {
 
         const token = crypto.randomBytes(24).toString('hex');
         const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+        // Check if a pending invite already exists for this email
+        const existingInvite = await WorkspaceInvitation.findOne({ workspace: workspace._id, email, status: 'PENDING' });
+        if (existingInvite) {
+            existingInvite.expiresAt = expiresAt; // renew expiry
+            await existingInvite.save();
+            return res.json({
+                mode: 'invite_renewed',
+                invitation: existingInvite,
+                inviteLink: buildInviteLink(req, existingInvite.token)
+            });
+        }
 
         const invitation = await WorkspaceInvitation.create({
             workspace: workspace._id,
@@ -200,10 +228,13 @@ exports.acceptInvitation = async (req, res) => {
             return res.status(400).json({ message: `Invite is ${invitation.status.toLowerCase()}` });
         }
 
-        if (invitation.expiresAt && invitation.expiresAt.getTime() < Date.now()) {
-            invitation.status = 'EXPIRED';
-            await invitation.save();
-            return res.status(400).json({ message: 'Invite expired' });
+        const userEmail = normalizeEmail(req.user.email);
+        const inviteEmail = normalizeEmail(invitation.email);
+
+        if (userEmail !== inviteEmail) {
+            return res.status(403).json({
+                message: `This invitation was sent to ${inviteEmail}, but you are logged in as ${userEmail}.`
+            });
         }
 
         const me = await User.findById(req.user.id).select('email name');
@@ -226,16 +257,30 @@ exports.acceptInvitation = async (req, res) => {
     }
 };
 
+exports.getPendingInvitations = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const invitations = await WorkspaceInvitation.find({
+            workspace: id,
+            status: 'PENDING',
+            expiresAt: { $gt: new Date() }
+        }).select('email status createdAt');
+        res.json(invitations);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 exports.getWorkspaceDashboard = async (req, res) => {
     try {
         const { id } = req.params;
-        const workspace = await Workspace.findById(id).populate('members', 'name email');
+        const workspace = await Workspace.findById(id).populate('members.user', 'name email');
 
         if (!workspace) {
             return res.status(404).json({ message: 'Workspace not found' });
         }
 
-        const isMember = workspace.members.some((member) => String(member._id) === String(req.user.id));
+        const isMember = workspace.members.some((member) => String(member.user?._id || member.user) === String(req.user.id));
         if (!isMember) {
             return res.status(403).json({ message: 'Access denied for this workspace' });
         }
@@ -267,6 +312,53 @@ exports.getWorkspaceDashboard = async (req, res) => {
         const openDeals = totalDeals - wonDeals - lostDeals;
         const winRate = totalDeals > 0 ? Number(((wonDeals / totalDeals) * 100).toFixed(1)) : 0;
 
+        // --- New Aggregations ---
+
+        // 1. Revenue Growth (Last 6 Months) - Workspace specific
+        const growthData = await Deal.aggregate([
+            { $match: { workspace: new mongoose.Types.ObjectId(id) } },
+            {
+                $group: {
+                    _id: {
+                        month: { $month: "$createdAt" },
+                        year: { $year: "$createdAt" }
+                    },
+                    value: { $sum: "$amount" },
+                    count: { $sum: 1 }
+                }
+            },
+            { $sort: { "_id.year": 1, "_id.month": 1 } },
+            { $limit: 6 }
+        ]);
+
+        const formattedGrowth = growthData.map(d => ({
+            name: new Date(d._id.year, d._id.month - 1).toLocaleString('default', { month: 'short' }),
+            value: d.value,
+            deals: d.count
+        }));
+
+        // 2. Assignee Performance Distribution
+        const assigneeDistribution = await Deal.aggregate([
+            { $match: { workspace: new mongoose.Types.ObjectId(id) } },
+            {
+                $group: {
+                    _id: "$assignee",
+                    count: { $sum: 1 },
+                    value: { $sum: "$amount" }
+                }
+            },
+            { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'user' } },
+            { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
+            {
+                $project: {
+                    name: { $ifNull: ["$user.name", "Unassigned"] },
+                    count: 1,
+                    value: 1
+                }
+            },
+            { $sort: { value: -1 } }
+        ]);
+
         const recentDeals = [...deals]
             .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
             .slice(0, 5)
@@ -294,9 +386,68 @@ exports.getWorkspaceDashboard = async (req, res) => {
                 wonValue,
                 winRate,
             },
+            growthData: formattedGrowth,
+            assigneeDistribution,
             stageCounts,
-            recentDeals,
+            recentDeals
         });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+// Role Management
+exports.updateMemberRole = async (req, res) => {
+    try {
+        const { id, userId } = req.params;
+        const { role } = req.body;
+
+        const workspace = await Workspace.findById(id);
+        if (!workspace) return res.status(404).json({ message: 'Workspace not found' });
+
+        // Check permissions: only Super Admin or Admins can change roles
+        const requester = workspace.members.find(m => String(m.user) === String(req.user.id));
+        if (!requester || (requester.role !== 'Super Admin' && requester.role !== 'Admin')) {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+
+        const memberIndex = workspace.members.findIndex(m => String(m.user) === String(userId));
+        if (memberIndex === -1) return res.status(404).json({ message: 'Member not found' });
+
+        workspace.members[memberIndex].role = role;
+        await workspace.save();
+
+        const updatedWorkspace = await Workspace.findById(id).populate('owner members.user', 'name email');
+        res.json(updatedWorkspace);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+exports.removeMember = async (req, res) => {
+    try {
+        const { id, userId } = req.params;
+
+        const workspace = await Workspace.findById(id);
+        if (!workspace) return res.status(404).json({ message: 'Workspace not found' });
+
+        // Check permissions: only Super Admin or Admins can remove members
+        const requester = workspace.members.find(m => String(m.user) === String(req.user.id));
+        if (!requester || (requester.role !== 'Super Admin' && requester.role !== 'Admin')) {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+
+        // Prevent removing the owner
+        if (String(workspace.owner) === String(userId)) {
+            return res.status(400).json({ message: 'Cannot remove workspace owner' });
+        }
+
+        workspace.members = workspace.members.filter(m => String(m.user) !== String(userId));
+        await workspace.save();
+
+        await User.findByIdAndUpdate(userId, { $pull: { workspaces: workspace._id } });
+
+        const updatedWorkspace = await Workspace.findById(id).populate('owner members.user', 'name email');
+        res.json(updatedWorkspace);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

@@ -15,11 +15,11 @@ import MattersPage from './pages/Matters'
 import ContactsPage from './pages/Contacts'
 import ActivitiesPage from './pages/Activities'
 import DealsPage from './pages/Deals'
-import BillingPage from './pages/Billing'
 import DocumentsPage from './pages/Documents'
 import CommunicationsPage from './pages/Communications'
 import ReportsPage from './pages/Reports'
 import SettingsPage from './pages/Settings'
+import TeamPage from './pages/Team'
 import api from './api'
 
 const PipelinePage = () => {
@@ -65,7 +65,7 @@ const AppShell = () => {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header onMenuClick={() => setMobileSidebarOpen(true)} />
         <main className="flex min-h-0 flex-1 flex-col overflow-hidden p-5 sm:p-6 lg:p-8">
-          <div className="mx-auto flex min-h-0 w-full max-w-[100rem] flex-1 flex-col rounded-2xl border border-slate-200/60 bg-white/80 p-4 shadow-sm shadow-slate-200/40 backdrop-blur-sm sm:p-5">
+          <div className="mx-auto flex min-h-0 w-full max-w-[100rem] flex-1 flex-col rounded-2xl border border-slate-200/60 bg-white/80 p-4 shadow-sm shadow-slate-200/40 backdrop-blur-sm sm:p-5 overflow-y-auto no-scrollbar">
             <Routes>
               <Route path="/" element={<Navigate to="/pipeline" replace />} />
               <Route path="/dashboard" element={<DashboardPage />} />
@@ -75,11 +75,11 @@ const AppShell = () => {
               <Route path="/contacts" element={<ContactsPage />} />
               <Route path="/activities" element={<ActivitiesPage />} />
               <Route path="/deals" element={<DealsPage />} />
-              <Route path="/billing" element={<BillingPage />} />
               <Route path="/documents" element={<DocumentsPage />} />
               <Route path="/communications" element={<CommunicationsPage />} />
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/team" element={<TeamPage />} />
               <Route path="*" element={<Navigate to="/pipeline" replace />} />
             </Routes>
           </div>
@@ -115,7 +115,7 @@ function App() {
 
   return (
     <BrowserRouter>
-      <Toaster position="top-right" />
+      <Toaster position="top-right" containerStyle={{ zIndex: 99999 }} />
       <Routes>
         <Route path="/login" element={!user ? <Login /> : <Navigate to="/pipeline" replace />} />
         <Route path="/register" element={!user ? <Register /> : <Navigate to="/pipeline" replace />} />
