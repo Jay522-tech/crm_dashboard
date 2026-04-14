@@ -12,7 +12,6 @@ const DealModal = ({ dealId, onClose }) => {
     const deal = deals.find(d => d._id === dealId)
     const activeWorkspace = workspaces.find(w => w._id === activeWorkspaceId)
 
-    const assignee = deal?.assignee
     const contact = deal?.contact
     const dealNotes = deal?.notes ? [...deal.notes].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)) : []
 
@@ -68,6 +67,17 @@ const DealModal = ({ dealId, onClose }) => {
                     <button onClick={onClose} className="p-2 hover:bg-muted rounded-full transition-colors">
                         <X size={24} />
                     </button>
+                </div>
+
+                <div className="px-6 pb-4 border-b border-border">
+                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Description</label>
+                    <textarea
+                        value={deal.description || ''}
+                        onChange={(e) => updateDeal(deal._id, { description: e.target.value })}
+                        placeholder="Short summary shown on the board card…"
+                        rows={2}
+                        className="mt-2 w-full rounded-xl bg-muted/40 border border-border px-3 py-2 text-sm leading-relaxed focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all resize-none"
+                    />
                 </div>
 
                 <div className="flex-1 overflow-auto flex flex-col md:flex-row">

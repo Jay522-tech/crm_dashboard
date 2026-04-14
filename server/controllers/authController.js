@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Workspace = require('../models/Workspace');
 const jwt = require('jsonwebtoken');
+const WorkspaceInvitation = require('../models/WorkspaceInvitation');
 
 const generateToken = (id) => {
     return jwt.sign({ id }, process.env.JWT_SECRET || 'secret123', { expiresIn: '30d' });
@@ -8,20 +9,42 @@ const generateToken = (id) => {
 
 exports.register = async (req, res) => {
     try {
-        const { name, email, password } = req.body;
+        const { name, email, password, inviteToken } = req.body;
         const userExists = await User.findOne({ email });
         if (userExists) return res.status(400).json({ message: 'User already exists' });
 
         const user = await User.create({ name, email, password });
 
-        // Create default workspace
-        const workspace = await Workspace.create({
-            name: 'My Workspace',
-            owner: user._id,
-            members: [user._id]
-        });
+        // If user registered via invite, join invited workspace; otherwise create default workspace.
+        if (inviteToken) {
+            const invitation = await WorkspaceInvitation.findOne({ token: String(inviteToken).trim() });
+            if (invitation && invitation.status === 'PENDING' && (!invitation.expiresAt || invitation.expiresAt.getTime() >= Date.now())) {
+                const workspace = await Workspace.findById(invitation.workspace);
+                if (workspace) {
+                    const isMember = workspace.members.some((m) => String(m) === String(user._id));
+                    if (!isMember) {
+                        workspace.members.push(user._id);
+                        await workspace.save();
+                    }
+                    user.workspaces.push(workspace._id);
+                    invitation.status = 'ACCEPTED';
+                    invitation.acceptedBy = user._id;
+                    invitation.acceptedAt = new Date();
+                    await invitation.save();
+                }
+            }
+        }
 
-        user.workspaces.push(workspace._id);
+        if ((user.workspaces || []).length === 0) {
+            const workspace = await Workspace.create({
+                name: 'My Workspace',
+                owner: user._id,
+                members: [user._id]
+            });
+
+            user.workspaces.push(workspace._id);
+        }
+
         await user.save();
 
         const token = generateToken(user._id);

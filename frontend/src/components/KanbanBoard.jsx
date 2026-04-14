@@ -7,16 +7,10 @@ import {
     useSensors,
     closestCorners
 } from '@dnd-kit/core'
-import {
-    arrayMove,
-    SortableContext,
-    verticalListSortingStrategy
-} from '@dnd-kit/sortable'
 import useStore from '../store'
 import KanbanColumn from './KanbanColumn'
 import DealCard from './DealCard'
-
-const STAGES = ['Lead', 'Contacted', 'Qualified', 'Won', 'Lost']
+import { STAGES } from '../constants/kanbanConfig'
 
 const KanbanBoard = ({ onDealClick }) => {
     const { deals, activeWorkspaceId, updateDealStage, addDeal, searchTerm } = useStore()
@@ -60,7 +54,7 @@ const KanbanBoard = ({ onDealClick }) => {
         }
     }
 
-    const handleDragEnd = (event) => {
+    const handleDragEnd = () => {
         setActiveId(null)
     }
 
@@ -74,17 +68,19 @@ const KanbanBoard = ({ onDealClick }) => {
             onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
         >
-            <div className="flex gap-6 h-full min-w-max pb-4">
-                {STAGES.map(stage => (
-                    <KanbanColumn
-                        key={stage}
-                        id={stage}
-                        title={stage}
-                        deals={workspaceDeals.filter(d => d.stage === stage)}
-                        onDealClick={onDealClick}
-                        onAddDeal={() => addDeal({ title: 'New Deal', stage, amount: 0 })}
-                    />
-                ))}
+            <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
+                <div className="flex min-h-0 flex-1 gap-5 overflow-x-auto pb-1">
+                    {STAGES.map((stage) => (
+                        <KanbanColumn
+                            key={stage}
+                            id={stage}
+                            title={stage}
+                            deals={workspaceDeals.filter((d) => d.stage === stage)}
+                            onDealClick={onDealClick}
+                            onAddDeal={() => addDeal({ title: 'New Deal', stage, amount: 0 })}
+                        />
+                    ))}
+                </div>
             </div>
 
             <DragOverlay>
