@@ -7,6 +7,16 @@ const generateToken = (id) => {
     return jwt.sign({ id }, process.env.JWT_SECRET || 'secret123', { expiresIn: '30d' });
 };
 
+const getCookieOptions = () => {
+    const isProduction = process.env.NODE_ENV === 'production';
+    return {
+        httpOnly: true,
+        sameSite: isProduction ? 'none' : 'lax',
+        secure: isProduction,
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+    };
+};
+
 exports.register = async (req, res) => {
     try {
         const { name, email, password, inviteToken } = req.body;
@@ -52,7 +62,7 @@ exports.register = async (req, res) => {
 
         const token = generateToken(user._id);
 
-        res.cookie('token', token, { httpOnly: true, maxAge: 30 * 24 * 60 * 60 * 1000 });
+        res.cookie('token', token, getCookieOptions());
         res.status(201).json({ id: user._id, name: user.name, email: user.email });
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -65,7 +75,7 @@ exports.login = async (req, res) => {
         const user = await User.findOne({ email });
         if (user && (await user.comparePassword(password))) {
             const token = generateToken(user._id);
-            res.cookie('token', token, { httpOnly: true, maxAge: 30 * 24 * 60 * 60 * 1000 });
+            res.cookie('token', token, getCookieOptions());
             res.json({ id: user._id, name: user.name, email: user.email });
         } else {
             res.status(401).json({ message: 'Invalid email or password' });
@@ -76,7 +86,7 @@ exports.login = async (req, res) => {
 };
 
 exports.logout = (req, res) => {
-    res.cookie('token', '', { expires: new Date(0) });
+    res.cookie('token', '', { ...getCookieOptions(), expires: new Date(0), maxAge: 0 });
     res.status(200).json({ message: 'Logged out' });
 };
 
