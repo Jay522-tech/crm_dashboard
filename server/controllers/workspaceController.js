@@ -1,6 +1,14 @@
 const Workspace = require('../models/Workspace');
 const User = require('../models/User');
 const Deal = require('../models/Deal');
+const mongoose = require('mongoose');
+const Contact = require('../models/Contact');
+const Event = require('../models/Event');
+const Matter = require('../models/Matter');
+const Activity = require('../models/Activity');
+const Document = require('../models/Document');
+const Communication = require('../models/Communication');
+const MessageTemplate = require('../models/MessageTemplate');
 const WorkspaceInvitation = require('../models/WorkspaceInvitation');
 const { logActivity } = require('../utils/activityLogger');
 const { sendWorkspaceInviteEmail } = require('../utils/mailer');
@@ -8,10 +16,24 @@ const crypto = require('crypto');
 
 const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
 
+const isLocalHostUrl = (url) => /localhost|127\.0\.0\.1|0\.0\.0\.0/.test(String(url || ''));
+
 const buildInviteLink = (req, token) => {
-    const origin = process.env.FRONTEND_ORIGIN
-        ? process.env.FRONTEND_ORIGIN.split(',')[0].trim()
-        : 'http://localhost:5173';
+    const configuredOrigins = String(process.env.FRONTEND_ORIGIN || '')
+        .split(',')
+        .map((o) => o.trim())
+        .filter(Boolean);
+
+    const requestOrigin = String(req.get('origin') || '').trim();
+    const preferredConfigured =
+        configuredOrigins.find((o) => !isLocalHostUrl(o)) ||
+        configuredOrigins[0] ||
+        '';
+
+    const origin = !isLocalHostUrl(requestOrigin) && requestOrigin
+        ? requestOrigin
+        : preferredConfigured || 'http://localhost:5173';
+
     return `${origin.replace(/\/$/, '')}/accept-invite?token=${encodeURIComponent(token)}`;
 };
 
@@ -448,6 +470,71 @@ exports.removeMember = async (req, res) => {
 
         const updatedWorkspace = await Workspace.findById(id).populate('owner members.user', 'name email');
         res.json(updatedWorkspace);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+exports.updateWorkspace = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name } = req.body;
+        const workspace = await Workspace.findById(id);
+        if (!workspace) return res.status(404).json({ message: 'Workspace not found' });
+
+        const requester = workspace.members.find(
+            (m) => String(m.user?._id || m.user) === String(req.user.id)
+        );
+        if (!requester || (requester.role !== 'Super Admin' && requester.role !== 'Admin')) {
+            return res.status(403).json({ message: 'You must be an Admin or Super Admin to update this workspace' });
+        }
+
+        if (name !== undefined) {
+            const trimmed = String(name).trim();
+            if (trimmed.length < 1) return res.status(400).json({ message: 'Name is required' });
+            if (trimmed.length > 120) return res.status(400).json({ message: 'Name is too long' });
+            workspace.name = trimmed;
+            await workspace.save();
+        }
+
+        const updated = await Workspace.findById(id).populate('owner members.user', 'name email');
+        res.json(updated);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+exports.deleteWorkspace = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const workspace = await Workspace.findById(id);
+        if (!workspace) return res.status(404).json({ message: 'Workspace not found' });
+
+        const requester = workspace.members.find(
+            (m) => String(m.user?._id || m.user) === String(req.user.id)
+        );
+        const isOwner = String(workspace.owner) === String(req.user.id);
+        const isSuperAdminMember = requester?.role === 'Super Admin';
+        if (!isOwner && !isSuperAdminMember) {
+            return res.status(403).json({ message: 'Only the owner or a Super Admin can delete this workspace' });
+        }
+
+        const wid = workspace._id;
+
+        await Deal.deleteMany({ workspace: wid });
+        await Contact.deleteMany({ workspace: wid });
+        await Event.deleteMany({ workspace: wid });
+        await Matter.deleteMany({ workspace: wid });
+        await Activity.deleteMany({ workspace: wid });
+        await Document.deleteMany({ workspaceId: wid });
+        await Communication.deleteMany({ workspaceId: wid });
+        await MessageTemplate.deleteMany({ workspaceId: wid });
+        await WorkspaceInvitation.deleteMany({ workspace: wid });
+
+        await Workspace.findByIdAndDelete(wid);
+        await User.updateMany({}, { $pull: { workspaces: wid } });
+
+        res.json({ message: 'Workspace deleted', id: wid });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

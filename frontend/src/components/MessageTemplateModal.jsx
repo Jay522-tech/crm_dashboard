@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
+import toast from 'react-hot-toast'
 import Modal from './Modal'
-import { FileText, Type, AlignLeft, Info } from 'lucide-react'
+import { FileText, Type, AlignLeft, Info, ChevronDown } from 'lucide-react'
 import useStore from '../store'
 
 const MessageTemplateModal = ({ isOpen, onClose }) => {
@@ -23,7 +24,7 @@ const MessageTemplateModal = ({ isOpen, onClose }) => {
             handleClose()
         } catch (error) {
             console.error('Failed to create template:', error)
-            alert('Failed to save template')
+            toast.error('Failed to save template')
         } finally {
             setLoading(false)
         }
@@ -55,15 +56,21 @@ const MessageTemplateModal = ({ isOpen, onClose }) => {
                         <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                             Type
                         </label>
-                        <select
-                            value={template.type}
-                            onChange={(e) => setTemplate({ ...template, type: e.target.value })}
-                            className="w-full px-4 py-2 rounded-lg bg-slate-50 border border-slate-200 focus:border-primary outline-none transition-all text-sm"
-                        >
-                            <option value="Email">Email</option>
-                            <option value="SMS">SMS</option>
-                            <option value="WhatsApp">WhatsApp</option>
-                        </select>
+                        <div className="relative">
+                            <select
+                                value={template.type}
+                                onChange={(e) => setTemplate({ ...template, type: e.target.value })}
+                                className="w-full appearance-none rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 pr-10 text-sm outline-none transition-all focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/15"
+                            >
+                                <option value="Email">Email</option>
+                                <option value="SMS">SMS</option>
+                                <option value="WhatsApp">WhatsApp</option>
+                            </select>
+                            <ChevronDown
+                                size={16}
+                                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
+                            />
+                        </div>
                     </div>
                 </div>
 

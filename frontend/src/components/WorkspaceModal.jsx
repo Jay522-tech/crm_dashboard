@@ -12,10 +12,15 @@ const WorkspaceModal = ({ isOpen, onClose }) => {
         if (!name.trim()) return
 
         setLoading(true)
-        await createWorkspace(name)
-        setLoading(false)
-        setName('')
-        onClose()
+        try {
+            await createWorkspace(name)
+            setName('')
+            onClose()
+        } catch {
+            /* toast in store */
+        } finally {
+            setLoading(false)
+        }
     }
 
     return (

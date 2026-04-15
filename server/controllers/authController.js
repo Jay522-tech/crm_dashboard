@@ -84,3 +84,24 @@ exports.getMe = async (req, res) => {
     const user = await User.findById(req.user.id).select('-password');
     res.json(user);
 };
+
+exports.updateMe = async (req, res) => {
+    try {
+        const { name } = req.body;
+        const user = await User.findById(req.user.id);
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        if (name !== undefined) {
+            const trimmed = String(name).trim();
+            if (trimmed.length < 1) return res.status(400).json({ message: 'Name is required' });
+            if (trimmed.length > 120) return res.status(400).json({ message: 'Name is too long' });
+            user.name = trimmed;
+            await user.save();
+        }
+
+        const fresh = await User.findById(req.user.id).select('-password');
+        res.json(fresh);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};

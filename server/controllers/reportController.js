@@ -73,12 +73,13 @@ exports.getReportStats = async (req, res) => {
             { $sort: { '_id.year': 1, '_id.month': 1 } }
         ]);
 
-        // Top Deals (highest amount)
+        // Top Deals (highest amount) — match workspace dashboard shape for UI
         const topDeals = await Deal.find(filter)
             .sort({ amount: -1 })
             .limit(5)
-            .select('title amount stage workspace')
-            .populate('workspace', 'name');
+            .select('title amount stage workspace updatedAt')
+            .populate('workspace', 'name')
+            .populate('assignee', 'name email');
 
         // Revenue by Workspace (only relevant for global scope)
         let revenueByWorkspace = [];
@@ -152,11 +153,33 @@ exports.getReportStats = async (req, res) => {
             { $sort: { value: -1 } }
         ]);
 
+        const base = stats[0] || {
+            totalDeals: 0,
+            totalValue: 0,
+            wonValue: 0,
+            lostValue: 0,
+            avgDealValue: 0
+        };
+        const stageCountMap = Object.fromEntries(stageDistribution.map((s) => [s._id, s.count]));
+        const wonDeals = stageCountMap.Won || 0;
+        const lostDeals = stageCountMap.Lost || 0;
+        const totalDeals = base.totalDeals || 0;
+        const openDeals = Math.max(0, totalDeals - wonDeals - lostDeals);
+        const winRate = totalDeals > 0 ? Number(((wonDeals / totalDeals) * 100).toFixed(1)) : 0;
+
         res.status(200).json({
-            summary: stats[0] || { totalDeals: 0, totalValue: 0, wonValue: 0, lostValue: 0, avgDealValue: 0 },
+            workspace: scope === 'global' ? { _id: null, name: 'All your workspaces' } : undefined,
+            summary: {
+                ...base,
+                openDeals,
+                wonDeals,
+                lostDeals,
+                winRate
+            },
             stageDistribution,
-            growthData: growthData.map(d => ({
-                name: `${d._id.month}/${d._id.year}`,
+            stageCounts: stageCountMap,
+            growthData: growthData.map((d) => ({
+                name: new Date(d._id.year, d._id.month - 1).toLocaleString('default', { month: 'short' }),
                 deals: d.count,
                 value: d.value
             })),

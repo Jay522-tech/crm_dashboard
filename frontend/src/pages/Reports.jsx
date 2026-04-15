@@ -1,19 +1,15 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
     BarChart3,
     PieChart as PieChartIcon,
     TrendingUp,
-    Download,
     Globe,
     Briefcase,
     ArrowUpRight,
-    ArrowDownRight,
     Loader2,
-    Sparkles,
-    Zap,
-    Filter
+    Users,
+    LayoutList,
 } from 'lucide-react'
-import PageHeader from '../components/PageHeader'
 import useStore from '../store'
 import {
     BarChart,
@@ -25,334 +21,511 @@ import {
     ResponsiveContainer,
     Cell,
     AreaChart,
-    Area
+    Area,
 } from 'recharts'
+import { cn } from '../lib/utils'
 
-const VIBRANT_PALETTE = [
-    { bg: 'bg-indigo-600', text: 'text-white', icon: 'bg-indigo-500', hex: '#4f46e5' },
-    { bg: 'bg-emerald-500', text: 'text-white', icon: 'bg-emerald-400', hex: '#10b981' },
-    { bg: 'bg-amber-500', text: 'text-white', icon: 'bg-amber-400', hex: '#f59e0b' },
-    { bg: 'bg-rose-500', text: 'text-white', icon: 'bg-rose-400', hex: '#f43f5e' },
-    { bg: 'bg-violet-600', text: 'text-white', icon: 'bg-violet-500', hex: '#8b5cf6' },
-    { bg: 'bg-cyan-500', text: 'text-white', icon: 'bg-cyan-400', hex: '#06b6d4' },
-]
+/** Soft fills — match Dashboard / light desktop look */
+const BAR_COLORS = ['#93c5fd', '#86efac', '#fcd34d', '#fca5a5', '#c4b5fd', '#67e8f9']
+
+const formatCurrency = (val) =>
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val || 0)
+
+const SUMMARY_DEFAULT = {
+    totalDeals: 0,
+    totalValue: 0,
+    wonValue: 0,
+    lostValue: 0,
+    avgDealValue: 0,
+    winRate: 0,
+    openDeals: 0,
+}
+
+const statAccent = {
+    sky: 'bg-sky-50/90 text-sky-700 ring-sky-100/80',
+    emerald: 'bg-emerald-50/90 text-emerald-700 ring-emerald-100/80',
+    amber: 'bg-amber-50/90 text-amber-800 ring-amber-100/80',
+    violet: 'bg-violet-50/90 text-violet-700 ring-violet-100/80',
+}
+
+function StatCard({ label, value, hint, icon, accent = 'sky' }) {
+    return (
+        <div className="rounded-2xl border border-slate-200/70 bg-white/90 p-5 shadow-sm transition-shadow hover:shadow-md">
+            <div
+                className={cn(
+                    'inline-flex rounded-xl p-2.5 ring-1',
+                    statAccent[accent] || statAccent.sky
+                )}
+            >
+                {icon}
+            </div>
+            <p className="mt-4 text-2xl font-semibold tracking-tight text-slate-800 tabular-nums">{value}</p>
+            <p className="mt-1 text-sm font-medium text-slate-600">{label}</p>
+            {hint ? <p className="mt-1 text-xs text-slate-400">{hint}</p> : null}
+        </div>
+    )
+}
+
+function StatCardSkeleton() {
+    return (
+        <div className="rounded-2xl border border-slate-200/70 bg-white/90 p-5 shadow-sm">
+            <div className="h-10 w-10 animate-pulse rounded-xl bg-slate-100" />
+            <div className="mt-4 h-8 w-28 animate-pulse rounded-md bg-slate-100" />
+            <div className="mt-2 h-4 w-32 animate-pulse rounded bg-slate-100" />
+        </div>
+    )
+}
+
+function ChartCard({ title, subtitle, children, className }) {
+    return (
+        <div
+            className={cn(
+                'rounded-2xl border border-slate-200/70 bg-white/90 p-6 shadow-sm sm:p-8',
+                className
+            )}
+        >
+            <div className="mb-6">
+                <h2 className="text-base font-semibold text-slate-800">{title}</h2>
+                <p className="mt-1 text-xs text-slate-400">{subtitle}</p>
+            </div>
+            {children}
+        </div>
+    )
+}
 
 const ReportsPage = () => {
-    const {
-        activeWorkspaceId,
-        reportStats,
-        reportLoading,
-        fetchReportStats
-    } = useStore()
-
+    const { activeWorkspaceId, reportStats, reportLoading, fetchReportStats } = useStore()
     const [scope, setScope] = useState('workspace')
 
     useEffect(() => {
         fetchReportStats(scope, activeWorkspaceId)
     }, [scope, activeWorkspaceId, fetchReportStats])
 
-    if (!reportStats && reportLoading) {
-        return (
-            <div className="h-full flex items-center justify-center">
-                <Loader2 className="animate-spin text-primary" size={32} />
-            </div>
-        )
-    }
+    const summary = useMemo(() => {
+        const s = reportStats?.summary
+        if (!s) return { ...SUMMARY_DEFAULT }
+        return { ...SUMMARY_DEFAULT, ...s }
+    }, [reportStats])
 
     const {
-        summary = { totalDeals: 0, totalValue: 0, wonValue: 0, lostValue: 0, avgDealValue: 0 },
         stageDistribution = [],
         growthData = [],
         topDeals = [],
         revenueByWorkspace = [],
-        assigneeDistribution = []
+        assigneeDistribution = [],
     } = reportStats || {}
 
-    const formatCurrency = (val) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val)
+    const stageBarData = useMemo(
+        () => (Array.isArray(stageDistribution) ? stageDistribution : []),
+        [stageDistribution]
+    )
+
+    const growthSeries = useMemo(
+        () => (Array.isArray(growthData) && growthData.length > 0 ? growthData : []),
+        [growthData]
+    )
+
+    const matrixRows = scope === 'global' ? revenueByWorkspace : stageDistribution
+    const maxMatrixValue = useMemo(() => {
+        if (!matrixRows?.length) return 1
+        return Math.max(
+            ...matrixRows.map((item) => Number(item.totalValue ?? item.value ?? 0) || 0),
+            1
+        )
+    }, [matrixRows])
+
+    if (!reportStats && reportLoading) {
+        return (
+            <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3 text-slate-500">
+                <Loader2 className="animate-spin text-sky-600" size={28} />
+                <p className="text-sm font-medium">Loading reports…</p>
+            </div>
+        )
+    }
 
     return (
-        <div className="flex flex-col gap-10 pb-16 animate-in fade-in slide-in-from-bottom-4 duration-1000">
-            <PageHeader
-                title="Intelligence Dashboard"
-                subtitle={scope === 'global' ? "Universal performance analytics & ecosystem health" : "Workspace-specific pipeline metrics & conversion data"}
-                icon={<BarChart3 size={22} className="text-indigo-600" />}
-                actions={(
-                    <div className="flex items-center gap-1.5 p-1.5 bg-slate-100/80 backdrop-blur-sm rounded-2xl border border-slate-200 shadow-inner">
+        <div className="flex flex-col gap-8 pb-10">
+            {/* Hero — same language as Dashboard */}
+            <div className="relative rounded-2xl border border-border/70 bg-gradient-to-br from-muted/70 via-card to-sky-500/10">
+                <div
+                    className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl"
+                    aria-hidden
+                >
+                    <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-sky-100/40 blur-3xl" />
+                    <div className="absolute -bottom-20 left-1/3 h-40 w-40 rounded-full bg-violet-100/35 blur-3xl" />
+                </div>
+                <div className="relative flex flex-col gap-6 px-6 py-8 sm:px-8 sm:py-9 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0 space-y-2">
+                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Analytics</p>
+                        <h1 className="text-3xl font-semibold leading-snug tracking-tight text-foreground sm:text-4xl sm:leading-snug">
+                            Reports
+                        </h1>
+                        <p className="max-w-xl text-sm leading-relaxed text-muted-foreground">
+                            {scope === 'global'
+                                ? 'Performance across every workspace you belong to.'
+                                : 'Pipeline economics and stage mix for the active workspace.'}
+                        </p>
+                    </div>
+                    <div className="inline-flex rounded-xl border border-border/70 bg-card/80 p-1 shadow-sm backdrop-blur-sm">
                         <button
+                            type="button"
                             onClick={() => setScope('workspace')}
-                            className={`flex items-center gap-2 px-6 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-300 ${scope === 'workspace' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : 'text-slate-500 hover:bg-white'}`}
+                            className={cn(
+                                'inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition-all',
+                                scope === 'workspace'
+                                    ? 'bg-foreground text-background shadow-sm'
+                                    : 'text-muted-foreground hover:bg-muted/40'
+                            )}
                         >
-                            <Briefcase size={14} strokeWidth={3} />
+                            <Briefcase size={14} />
                             Workspace
                         </button>
                         <button
+                            type="button"
                             onClick={() => setScope('global')}
-                            className={`flex items-center gap-2 px-6 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-300 ${scope === 'global' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : 'text-slate-500 hover:bg-white'}`}
+                            className={cn(
+                                'inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition-all',
+                                scope === 'global'
+                                    ? 'bg-foreground text-background shadow-sm'
+                                    : 'text-muted-foreground hover:bg-muted/40'
+                            )}
                         >
-                            <Globe size={14} strokeWidth={3} />
+                            <Globe size={14} />
                             Global
                         </button>
                     </div>
+                </div>
+            </div>
+
+            {/* KPIs */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {reportLoading ? (
+                    <>
+                        <StatCardSkeleton />
+                        <StatCardSkeleton />
+                        <StatCardSkeleton />
+                        <StatCardSkeleton />
+                    </>
+                ) : (
+                    <>
+                        <StatCard
+                            label="Pipeline value"
+                            value={formatCurrency(summary.totalValue)}
+                            hint={`${summary.totalDeals} deals in scope`}
+                            accent="sky"
+                            icon={<TrendingUp size={20} strokeWidth={2} />}
+                        />
+                        <StatCard
+                            label="Won revenue"
+                            value={formatCurrency(summary.wonValue)}
+                            hint="Closed won"
+                            accent="emerald"
+                            icon={<ArrowUpRight size={20} strokeWidth={2} />}
+                        />
+                        <StatCard
+                            label="Average deal size"
+                            value={formatCurrency(summary.avgDealValue)}
+                            hint="Mean amount"
+                            accent="amber"
+                            icon={<PieChartIcon size={20} strokeWidth={2} />}
+                        />
+                        <StatCard
+                            label="Win rate"
+                            value={`${summary.winRate ?? 0}%`}
+                            hint={`${summary.openDeals ?? 0} open deals`}
+                            accent="violet"
+                            icon={<BarChart3 size={20} strokeWidth={2} />}
+                        />
+                    </>
                 )}
-            />
-
-            {/* Vibrant Stat Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                <VibrantCard
-                    label="Pipeline Value"
-                    value={formatCurrency(summary.totalValue)}
-                    sub={`${summary.totalDeals} Opportunities`}
-                    icon={<TrendingUp size={24} />}
-                    colorSet={VIBRANT_PALETTE[0]}
-                />
-                <VibrantCard
-                    label="Won Revenue"
-                    value={formatCurrency(summary.wonValue)}
-                    sub="Closed-won total"
-                    icon={<ArrowUpRight size={24} />}
-                    colorSet={VIBRANT_PALETTE[1]}
-                />
-                <VibrantCard
-                    label="Avg Asset Size"
-                    value={formatCurrency(summary.avgDealValue)}
-                    sub="Per active deal"
-                    icon={<PieChartIcon size={24} />}
-                    colorSet={VIBRANT_PALETTE[2]}
-                />
-                <VibrantCard
-                    label="Active Delta"
-                    value={summary.totalDeals}
-                    sub="Current lifecycle"
-                    icon={<Zap size={24} />}
-                    colorSet={VIBRANT_PALETTE[3]}
-                />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                {/* Distribution Chart */}
-                <div className="bg-white rounded-[2.5rem] border border-slate-100 p-10 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.05)]">
-                    <div className="flex items-center justify-between mb-10">
-                        <div>
-                            <h3 className="text-xl font-black text-slate-900 tracking-tight">Market Distribution</h3>
-                            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Deal Volume by Stage</p>
-                        </div>
-                    </div>
-                    <div className="h-[350px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={stageDistribution} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                                <CartesianGrid strokeDasharray="8 8" vertical={false} stroke="#f1f5f9" />
-                                <XAxis dataKey="_id" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 800 }} dy={15} />
-                                <YAxis
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 800 }}
-                                    tickFormatter={(val) => val >= 1000 ? `$${(val / 1000).toFixed(1)}k` : `$${val}`}
-                                />
-                                <Tooltip
-                                    contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 20px 40px rgba(0,0,0,0.1)', padding: '16px' }}
-                                    cursor={{ fill: 'rgba(79, 70, 229, 0.05)' }}
-                                    formatter={(value) => [formatCurrency(value), 'Value']}
-                                />
-                                <Bar dataKey="count" radius={[10, 10, 0, 0]} barSize={45}>
-                                    {stageDistribution.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={VIBRANT_PALETTE[index % VIBRANT_PALETTE.length].hex} />
-                                    ))}
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-
-                {/* Growth Chart */}
-                <div className="bg-white rounded-[2.5rem] border border-slate-100 p-10 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.05)]">
-                    <div className="flex items-center justify-between mb-10">
-                        <div>
-                            <h3 className="text-xl font-black text-slate-900 tracking-tight">Growth Momentum</h3>
-                            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Total Pipeline Trajectory</p>
-                        </div>
-                    </div>
-                    <div className="h-[350px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={growthData} margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
-                                <defs>
-                                    <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="8 8" vertical={false} stroke="#f1f5f9" />
-                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 800 }} dy={15} />
-                                <YAxis
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 800 }}
-                                    domain={['auto', 'auto']}
-                                    tickFormatter={(val) => val >= 1000 ? `$${(val / 1000).toFixed(1)}k` : `$${val}`}
-                                />
-                                <Tooltip
-                                    contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 20px 40px rgba(0,0,0,0.1)', padding: '16px' }}
-                                    formatter={(value) => [formatCurrency(value), 'Momentum']}
-                                />
-                                <Area
-                                    type="monotone"
-                                    dataKey="value"
-                                    stroke="#4f46e5"
-                                    strokeWidth={4}
-                                    fillOpacity={1}
-                                    fill="url(#colorValue)"
-                                    dot={{ r: 6, fill: '#4f46e5', strokeWidth: 2, stroke: '#fff' }}
-                                    activeDot={{ r: 8, strokeWidth: 0 }}
-                                />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-10">
-                {/* Top Deals List */}
-                <div className="bg-white rounded-[2.5rem] border border-slate-100 overflow-hidden shadow-sm">
-                    <div className="p-8 border-b border-slate-50 flex items-center justify-between">
-                        <h3 className="text-base font-black text-slate-900 uppercase tracking-widest">Alpha Assets</h3>
-                        <Sparkles size={16} className="text-amber-500 animate-pulse" />
-                    </div>
-                    <div className="divide-y divide-slate-50">
-                        {topDeals.length > 0 ? topDeals.map((deal, idx) => (
-                            <div key={deal._id} className="p-6 hover:bg-slate-50 transition-colors flex items-center justify-between group">
-                                <div className="min-w-0">
-                                    <p className="text-sm font-black text-slate-800 truncate group-hover:text-indigo-600 transition-colors">{deal.title}</p>
-                                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 tracking-tighter">{(deal.workspace?.name || 'Main')} • {deal.stage}</p>
-                                </div>
-                                <div className="text-right ml-4">
-                                    <p className="text-base font-black text-slate-950 font-mono">{formatCurrency(deal.amount)}</p>
-                                </div>
+            {/* Charts */}
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <ChartCard title="Deals by stage" subtitle="Count of deals in each stage for this report scope">
+                    <div className="h-[320px] w-full min-h-[260px]">
+                        {stageBarData.length === 0 ? (
+                            <div className="flex h-full flex-col items-center justify-center rounded-xl border border-dashed border-slate-200/90 bg-slate-50/40 text-center text-sm text-slate-500">
+                                No stage data for this scope yet.
                             </div>
-                        )) : (
-                            <div className="p-16 text-center text-slate-300 text-xs font-bold uppercase tracking-widest">Zero High-Value Delta</div>
+                        ) : (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={stageBarData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                    <XAxis
+                                        dataKey="_id"
+                                        axisLine={false}
+                                        tickLine={false}
+                                        tick={{ fill: '#94a3b8', fontSize: 11 }}
+                                        dy={8}
+                                    />
+                                    <YAxis
+                                        axisLine={false}
+                                        tickLine={false}
+                                        tick={{ fill: '#94a3b8', fontSize: 11 }}
+                                        allowDecimals={false}
+                                        tickFormatter={(v) => String(v)}
+                                    />
+                                    <Tooltip
+                                        cursor={{ fill: 'rgba(125, 211, 252, 0.12)' }}
+                                        content={({ active, payload, label }) =>
+                                            active && payload?.length ? (
+                                                <div className="rounded-lg border border-slate-200/90 bg-white px-3 py-2 shadow-md">
+                                                    <p className="text-[11px] font-medium text-slate-500">{label}</p>
+                                                    <p className="text-sm font-semibold text-slate-800">
+                                                        {payload[0].value} deals
+                                                    </p>
+                                                </div>
+                                            ) : null
+                                        }
+                                    />
+                                    <Bar dataKey="count" radius={[8, 8, 0, 0]} maxBarSize={48}>
+                                        {stageBarData.map((_, index) => (
+                                            <Cell key={`bar-${index}`} fill={BAR_COLORS[index % BAR_COLORS.length]} />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        )}
+                    </div>
+                </ChartCard>
+
+                <ChartCard
+                    title="Revenue trend"
+                    subtitle="Deal value created per month (recent window)"
+                >
+                    <div className="h-[320px] w-full min-h-[260px]">
+                        {growthSeries.length === 0 ? (
+                            <div className="flex h-full flex-col items-center justify-center rounded-xl border border-dashed border-slate-200/90 bg-slate-50/40 text-center text-sm text-slate-500">
+                                No growth series yet — add dated deals to see the curve.
+                            </div>
+                        ) : (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={growthSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                                    <defs>
+                                        <linearGradient id="reportsAreaFill" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#7dd3fc" stopOpacity={0.35} />
+                                            <stop offset="95%" stopColor="#7dd3fc" stopOpacity={0} />
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                    <XAxis
+                                        dataKey="name"
+                                        axisLine={false}
+                                        tickLine={false}
+                                        tick={{ fill: '#94a3b8', fontSize: 11 }}
+                                        dy={8}
+                                    />
+                                    <YAxis
+                                        axisLine={false}
+                                        tickLine={false}
+                                        tick={{ fill: '#94a3b8', fontSize: 11 }}
+                                        domain={['auto', 'auto']}
+                                        tickFormatter={(val) =>
+                                            val >= 1000 ? `$${(val / 1000).toFixed(1)}k` : `$${val}`
+                                        }
+                                    />
+                                    <Tooltip
+                                        content={({ active, payload }) =>
+                                            active && payload?.length ? (
+                                                <div className="rounded-lg border border-slate-200/90 bg-white px-3 py-2 shadow-md">
+                                                    <p className="text-[11px] font-medium text-slate-500">
+                                                        {payload[0].payload.name}
+                                                    </p>
+                                                    <p className="text-sm font-semibold text-sky-700">
+                                                        {formatCurrency(payload[0].value)}
+                                                    </p>
+                                                </div>
+                                            ) : null
+                                        }
+                                    />
+                                    <Area
+                                        type="monotone"
+                                        dataKey="value"
+                                        stroke="#38bdf8"
+                                        strokeWidth={2}
+                                        fillOpacity={1}
+                                        fill="url(#reportsAreaFill)"
+                                        dot={{ r: 4, fill: '#38bdf8', strokeWidth: 0 }}
+                                        activeDot={{ r: 6 }}
+                                    />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        )}
+                    </div>
+                </ChartCard>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+                <div className="rounded-2xl border border-slate-200/70 bg-white/90 shadow-sm">
+                    <div className="flex items-center justify-between border-b border-slate-100/90 px-6 py-4 sm:px-8">
+                        <h2 className="text-sm font-semibold text-slate-800">Top deals</h2>
+                        <LayoutList size={16} className="text-slate-400" />
+                    </div>
+                    <div className="divide-y divide-slate-100/90">
+                        {topDeals.length > 0 ? (
+                            topDeals.map((deal) => (
+                                <div
+                                    key={deal._id}
+                                    className="flex items-center justify-between gap-4 px-6 py-4 transition-colors hover:bg-slate-50/80 sm:px-8"
+                                >
+                                    <div className="min-w-0">
+                                        <p className="truncate text-sm font-semibold text-slate-800">{deal.title}</p>
+                                        <p className="mt-0.5 text-xs text-slate-500">
+                                            {deal.workspace?.name || 'Workspace'} · {deal.stage}
+                                        </p>
+                                    </div>
+                                    <p className="shrink-0 text-sm font-semibold tabular-nums text-sky-700">
+                                        {formatCurrency(deal.amount)}
+                                    </p>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="px-6 py-14 text-center text-sm text-slate-400 sm:px-8">
+                                No deals in this scope.
+                            </div>
                         )}
                     </div>
                 </div>
 
-                {/* Analysis Table */}
-                <div className="xl:col-span-2 bg-white rounded-[2.5rem] border border-slate-100 overflow-hidden shadow-sm">
-                    <div className="p-8 border-b border-slate-50">
-                        <h3 className="text-base font-black text-slate-900 uppercase tracking-widest">Performance Matrix</h3>
+                <div className="xl:col-span-2 rounded-2xl border border-slate-200/70 bg-white/90 shadow-sm overflow-hidden">
+                    <div className="border-b border-slate-100/90 px-6 py-4 sm:px-8">
+                        <h2 className="text-sm font-semibold text-slate-800">
+                            {scope === 'global' ? 'Revenue by workspace' : 'Value by stage'}
+                        </h2>
+                        <p className="mt-1 text-xs text-slate-400">
+                            Volume, totals, and average deal size
+                        </p>
                     </div>
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                            <thead className="bg-slate-50/50">
-                                <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
-                                    <th className="py-5 px-8">Sector</th>
-                                    <th className="py-5 px-8 text-center">Volume</th>
-                                    <th className="py-5 px-8">Market Value</th>
-                                    <th className="py-5 px-8 text-right">Avg Yield</th>
+                        <table className="w-full min-w-[640px] text-left text-sm">
+                            <thead className="bg-slate-50/80 text-xs font-medium text-slate-500">
+                                <tr className="border-b border-slate-100/90">
+                                    <th className="px-6 py-3 sm:px-8">{scope === 'global' ? 'Workspace' : 'Stage'}</th>
+                                    <th className="px-6 py-3 text-center sm:px-8">Deals</th>
+                                    <th className="px-6 py-3 sm:px-8">Total value</th>
+                                    <th className="px-6 py-3 text-right sm:px-8">Avg / deal</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-50">
-                                {(scope === 'global' ? revenueByWorkspace : stageDistribution).map((item, idx) => (
-                                    <tr key={item._id || item.name} className="hover:bg-indigo-50/10 transition-colors">
-                                        <td className="py-6 px-8">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-3 h-3 rounded-full shadow-lg shadow-indigo-100" style={{ backgroundColor: VIBRANT_PALETTE[idx % VIBRANT_PALETTE.length].hex }} />
-                                                <span className="text-sm font-black text-slate-800">{item.name || item._id}</span>
-                                            </div>
-                                        </td>
-                                        <td className="py-6 px-8 text-sm font-black text-slate-400 text-center">{item.count}</td>
-                                        <td className="py-6 px-8">
-                                            <div className="flex flex-col gap-2">
-                                                <span className="text-base font-black text-slate-900 leading-none">{formatCurrency(item.totalValue || item.value)}</span>
-                                                <div className="w-full max-w-[140px] h-2 bg-slate-100 rounded-full overflow-hidden shadow-inner">
-                                                    <div
-                                                        className="h-full rounded-full transition-all duration-1000 ease-out"
-                                                        style={{
-                                                            width: `${Math.min(100, ((item.totalValue || item.value) / (summary.totalValue || 1)) * 100)}%`,
-                                                            backgroundColor: VIBRANT_PALETTE[idx % VIBRANT_PALETTE.length].hex
-                                                        }}
-                                                    />
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="py-6 px-8 text-sm font-black text-slate-500 text-right font-mono">
-                                            {formatCurrency((item.totalValue || item.value) / (item.count || 1))}
+                            <tbody className="divide-y divide-slate-100/90 text-slate-700">
+                                {matrixRows.length > 0 ? (
+                                    matrixRows.map((item, idx) => {
+                                        const label = item.name || item._id
+                                        const count = item.count ?? 0
+                                        const total = Number(item.totalValue ?? item.value ?? 0)
+                                        const avg = count ? total / count : 0
+                                        const pct = Math.min(100, (total / maxMatrixValue) * 100)
+                                        return (
+                                            <tr key={String(label)} className="hover:bg-slate-50/50">
+                                                <td className="px-6 py-4 sm:px-8">
+                                                    <div className="flex items-center gap-3">
+                                                        <span
+                                                            className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                                            style={{
+                                                                backgroundColor: BAR_COLORS[idx % BAR_COLORS.length],
+                                                            }}
+                                                        />
+                                                        <span className="font-medium text-slate-800">{label}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 text-center tabular-nums text-slate-600 sm:px-8">
+                                                    {count}
+                                                </td>
+                                                <td className="px-6 py-4 sm:px-8">
+                                                    <span className="font-semibold text-slate-900 tabular-nums">
+                                                        {formatCurrency(total)}
+                                                    </span>
+                                                    <div className="mt-2 h-1.5 max-w-[160px] overflow-hidden rounded-full bg-slate-100">
+                                                        <div
+                                                            className="h-full rounded-full bg-sky-300/90 transition-all duration-500"
+                                                            style={{ width: `${pct}%` }}
+                                                        />
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 text-right tabular-nums text-slate-600 sm:px-8">
+                                                    {formatCurrency(avg)}
+                                                </td>
+                                            </tr>
+                                        )
+                                    })
+                                ) : (
+                                    <tr>
+                                        <td colSpan={4} className="px-6 py-12 text-center text-slate-400 sm:px-8">
+                                            No rows for this scope.
                                         </td>
                                     </tr>
-                                ))}
+                                )}
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
 
-            {/* Team Board */}
-            <div className="bg-white rounded-[2.5rem] border border-slate-100 p-10 shadow-sm">
-                <div className="mb-10 border-b border-slate-50 pb-8">
-                    <h3 className="text-xl font-black text-slate-900 tracking-tight">Operator Efficiency Matrix</h3>
-                    <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Individual Contribution and Win Probability</p>
+            {/* Team */}
+            <div className="rounded-2xl border border-slate-200/70 bg-white/90 p-6 shadow-sm sm:p-8">
+                <div className="mb-6 flex items-center gap-3 border-b border-slate-100/90 pb-6">
+                    <div className="rounded-xl bg-sky-50/90 p-2 text-sky-700 ring-1 ring-sky-100/80">
+                        <Users size={18} />
+                    </div>
+                    <div>
+                        <h2 className="text-base font-semibold text-slate-800">Team performance</h2>
+                        <p className="text-xs text-slate-400">Deal load, value, and win rate by assignee</p>
+                    </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                    {assigneeDistribution.length > 0 ? assigneeDistribution.map((member, idx) => (
-                        <div key={member.name} className="p-8 rounded-3xl border border-slate-100 bg-white hover:border-indigo-500 hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-500 group relative overflow-hidden">
-                            <div className="absolute -top-10 -right-10 w-24 h-24 bg-indigo-50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                            <div className="flex items-center gap-5 mb-8 relative z-10">
-                                <div className={`h-14 w-14 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-xl group-hover:bg-indigo-600 transition-colors shadow-lg`}>
-                                    {member.name.charAt(0).toUpperCase()}
-                                </div>
-                                <div className="min-w-0">
-                                    <p className="text-base font-black text-slate-950 truncate">{member.name}</p>
-                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{member.count} Active Captures</p>
-                                </div>
-                            </div>
-                            <div className="space-y-5 relative z-10">
-                                <div className="flex justify-between items-end">
-                                    <div>
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Impact Value</p>
-                                        <p className="text-lg font-black text-slate-900 font-mono tracking-tighter">{formatCurrency(member.value)}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Win Probability</p>
-                                        <p className="text-base font-black text-indigo-600">{Math.round(member.winRate)}%</p>
-                                    </div>
-                                </div>
-                                <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                {assigneeDistribution.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                        {assigneeDistribution.map((member, idx) => (
+                            <div
+                                key={member.name}
+                                className="rounded-2xl border border-slate-200/60 bg-slate-50/30 p-5 transition-colors hover:border-slate-200 hover:bg-white"
+                            >
+                                <div className="flex items-center gap-3">
                                     <div
-                                        className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 transition-all duration-1500"
-                                        style={{ width: `${member.winRate}%` }}
-                                    />
+                                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-semibold text-white"
+                                        style={{ backgroundColor: BAR_COLORS[idx % BAR_COLORS.length] }}
+                                    >
+                                        {(member.name || '?').charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="truncate font-semibold text-slate-800">{member.name}</p>
+                                        <p className="text-xs text-slate-500">{member.count} deals</p>
+                                    </div>
+                                </div>
+                                <div className="mt-4 space-y-3 text-xs">
+                                    <div className="flex justify-between gap-2">
+                                        <span className="text-slate-500">Pipeline value</span>
+                                        <span className="font-semibold tabular-nums text-slate-800">
+                                            {formatCurrency(member.value)}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between gap-2">
+                                        <span className="text-slate-500">Win rate</span>
+                                        <span className="font-semibold text-sky-700 tabular-nums">
+                                            {Math.round(Number(member.winRate) || 0)}%
+                                        </span>
+                                    </div>
+                                    <div className="h-1.5 overflow-hidden rounded-full bg-slate-200/80">
+                                        <div
+                                            className="h-full rounded-full bg-sky-400/90 transition-all duration-500"
+                                            style={{
+                                                width: `${Math.min(100, Math.max(0, Number(member.winRate) || 0))}%`,
+                                            }}
+                                        />
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    )) : (
-                        <div className="col-span-full py-24 text-center text-slate-200">
-                            <Briefcase size={48} className="mx-auto mb-6 opacity-10" />
-                            <p className="text-sm font-black uppercase tracking-[0.5em]">No Operational Data</p>
-                        </div>
-                    )}
-                </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200/90 bg-slate-50/40 py-16 text-center">
+                        <Briefcase size={36} className="text-slate-300" />
+                        <p className="text-sm font-medium text-slate-600">No assignee breakdown</p>
+                        <p className="text-xs text-slate-400">Assign deals to team members to populate this section.</p>
+                    </div>
+                )}
             </div>
         </div>
     )
 }
-
-const VibrantCard = ({ label, value, sub, icon, colorSet }) => (
-    <div className={`${colorSet.bg} ${colorSet.text} p-10 rounded-[2.5rem] shadow-2xl relative overflow-hidden group hover:scale-[1.02] transition-transform duration-500`}>
-        {/* Subtle decorative circle */}
-        <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-2xl group-hover:bg-white/20 transition-all duration-700" />
-
-        <div className="relative z-10">
-            <div className="flex items-center justify-between mb-8">
-                <div className={`${colorSet.icon} h-14 w-14 rounded-2xl flex items-center justify-center shadow-lg border border-white/10`}>
-                    {icon}
-                </div>
-                <div className="h-2 w-8 bg-white/20 rounded-full group-hover:w-12 transition-all duration-500" />
-            </div>
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60 mb-2">{label}</p>
-            <p className="text-3xl font-black tracking-tighter mb-4">{value}</p>
-            <div className="pt-4 border-t border-white/10 flex items-center gap-2">
-                <div className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
-                <span className="text-[10px] font-black uppercase tracking-widest opacity-80">{sub}</span>
-            </div>
-        </div>
-    </div>
-)
 
 export default ReportsPage

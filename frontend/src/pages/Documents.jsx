@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react'
-import { FileText, Upload, Search, Trash2, Download, File } from 'lucide-react'
+import { FileText, Upload, Trash2, Download, File } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 import FeatureCard from '../components/FeatureCard'
 import DocumentUploadModal from '../components/DocumentUploadModal'
+import ConfirmDialog from '../components/ConfirmDialog'
 import useStore from '../store'
 import { format } from 'date-fns'
 
@@ -11,11 +12,12 @@ const DocumentsPage = () => {
         documents,
         fetchDocuments,
         deleteDocument,
-        activeWorkspaceId
+        activeWorkspaceId,
+        searchTerm,
     } = useStore()
 
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
-    const [searchTerm, setSearchTerm] = useState('')
+    const [deleteDocId, setDeleteDocId] = useState(null)
 
     useEffect(() => {
         if (activeWorkspaceId) {
@@ -23,16 +25,22 @@ const DocumentsPage = () => {
         }
     }, [activeWorkspaceId, fetchDocuments])
 
-    const handleDelete = async (id) => {
-        if (window.confirm('Are you sure you want to delete this document?')) {
-            await deleteDocument(id)
-        }
+    const handleDeleteClick = (id) => setDeleteDocId(id)
+
+    const confirmDeleteDocument = async () => {
+        if (!deleteDocId) return
+        await deleteDocument(deleteDocId)
     }
 
-    const filteredDocuments = documents.filter(doc =>
-        doc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        doc.originalName.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    const q = (searchTerm || '').trim().toLowerCase()
+    const filteredDocuments = documents.filter((doc) => {
+        if (!q) return true
+        return (
+            doc.name.toLowerCase().includes(q) ||
+            doc.originalName.toLowerCase().includes(q) ||
+            (Array.isArray(doc.tags) && doc.tags.some((tag) => String(tag).toLowerCase().includes(q)))
+        )
+    })
 
     const formatFileSize = (bytes) => {
         if (bytes === 0) return '0 Bytes'
@@ -47,6 +55,17 @@ const DocumentsPage = () => {
             <DocumentUploadModal
                 isOpen={isUploadModalOpen}
                 onClose={() => setIsUploadModalOpen(false)}
+            />
+
+            <ConfirmDialog
+                isOpen={Boolean(deleteDocId)}
+                onClose={() => setDeleteDocId(null)}
+                title="Delete document?"
+                message="Are you sure you want to delete this document? This cannot be undone."
+                confirmLabel="Delete"
+                cancelLabel="Cancel"
+                danger
+                onConfirm={confirmDeleteDocument}
             />
 
             <PageHeader
@@ -69,15 +88,7 @@ const DocumentsPage = () => {
                 <div className="xl:col-span-2 flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm min-h-[18rem]">
                     <div className="flex items-center justify-between gap-3 mb-4">
                         <p className="text-sm font-semibold text-slate-800">Files ({filteredDocuments.length})</p>
-                        <div className="relative w-full max-w-sm">
-                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                            <input
-                                placeholder="Search documents..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full rounded-xl border border-slate-200/90 bg-slate-50/80 py-2 pl-9 pr-3 text-sm text-slate-800 placeholder:text-slate-400 shadow-sm outline-none transition focus:border-primary/40 focus:bg-white focus:ring-2 focus:ring-primary/15"
-                            />
-                        </div>
+                        <p className="text-xs text-slate-500 max-sm:hidden">Use the header search to filter files</p>
                     </div>
 
                     <div className="flex-1 overflow-y-auto">
@@ -121,7 +132,7 @@ const DocumentsPage = () => {
                                                 <Download size={16} />
                                             </a>
                                             <button
-                                                onClick={() => handleDelete(doc._id)}
+                                                onClick={() => handleDeleteClick(doc._id)}
                                                 className="p-2 text-slate-400 hover:text-red-500 hover:bg-white rounded-lg transition-colors"
                                                 title="Delete"
                                             >

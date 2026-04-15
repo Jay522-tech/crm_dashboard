@@ -99,6 +99,54 @@
   }
 }
 
+/*
+ * Global dark-mode compatibility layer:
+ * Many screens still use fixed slate/white utility classes.
+ * These overrides ensure consistent dark rendering across all pages.
+ */
+@layer utilities {
+  .dark [class*="bg-white"] {
+    background-color: hsl(var(--card)) !important;
+  }
+
+  .dark [class*="bg-slate-50"],
+  .dark [class*="bg-slate-100"] {
+    background-color: hsl(var(--muted)) !important;
+  }
+
+  .dark [class*="bg-slate-200"] {
+    background-color: hsl(var(--accent)) !important;
+  }
+
+  .dark [class*="border-slate-50"],
+  .dark [class*="border-slate-100"],
+  .dark [class*="border-slate-200"],
+  .dark [class*="border-slate-300"] {
+    border-color: hsl(var(--border)) !important;
+  }
+
+  .dark [class*="text-slate-900"],
+  .dark [class*="text-slate-800"] {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  .dark [class*="text-slate-700"],
+  .dark [class*="text-slate-600"] {
+    color: hsl(var(--foreground) / 0.86) !important;
+  }
+
+  .dark [class*="text-slate-500"],
+  .dark [class*="text-slate-400"],
+  .dark [class*="text-slate-300"] {
+    color: hsl(var(--muted-foreground)) !important;
+  }
+
+  .dark [class*="hover:bg-slate-50"]:hover,
+  .dark [class*="hover:bg-slate-100"]:hover {
+    background-color: hsl(var(--muted)) !important;
+  }
+}
+
 /* Custom Kanban Scrollbar */
 .kanban-column::-webkit-scrollbar {
   width: 6px;
@@ -114,6 +162,27 @@
 
 .kanban-column::-webkit-scrollbar-thumb:hover {
   @apply bg-muted-foreground/30;
+}
+
+/* Horizontal scrollbar for pipeline board */
+.kanban-horizontal-scroll::-webkit-scrollbar {
+  height: 7px;
+}
+
+.kanban-horizontal-scroll::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+.kanban-horizontal-scroll::-webkit-scrollbar-thumb {
+  @apply rounded-full bg-muted-foreground/30;
+}
+
+.kanban-horizontal-scroll::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/45;
+}
+
+.kanban-horizontal-scroll {
+  scrollbar-width: thin;
 }
 
 /* Hide scrollbar utility */

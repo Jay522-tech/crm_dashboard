@@ -5,14 +5,18 @@ const { logActivity } = require('../utils/activityLogger');
 async function assertWorkspaceMember(workspaceId, userId) {
     const workspace = await Workspace.findById(workspaceId).select('members');
     if (!workspace) return { ok: false, status: 404, message: 'Workspace not found' };
-    const isMember = workspace.members.some((m) => String(m) === String(userId));
+    const isMember = workspace.members.some((m) => {
+        const memberUser = m?.user || m;
+        const memberId = memberUser?._id || memberUser?.id || memberUser;
+        return String(memberId) === String(userId);
+    });
     if (!isMember) return { ok: false, status: 403, message: 'Access denied for this workspace' };
     return { ok: true };
 }
 
 exports.listMatters = async (req, res) => {
     try {
-        const { workspaceId } = req.query;
+        const workspaceId = req.query.workspaceId || req.params.workspaceId;
         if (!workspaceId) return res.status(400).json({ message: 'workspaceId is required' });
 
         const access = await assertWorkspaceMember(workspaceId, req.user.id);

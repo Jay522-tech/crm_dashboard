@@ -6,6 +6,7 @@ import Sidebar from './components/Sidebar'
 import KanbanBoard from './components/KanbanBoard'
 import Header from './components/Header'
 import DealModal from './components/DealModal'
+import NewDealModal from './components/NewDealModal'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import AcceptInvite from './pages/AcceptInvite'
@@ -22,12 +23,15 @@ import SettingsPage from './pages/Settings'
 import TeamPage from './pages/Team'
 import api from './api'
 
-const PipelinePage = () => {
+const PipelinePage = ({ onCreateDealRequest }) => {
   const [selectedDealId, setSelectedDealId] = useState(null)
 
   return (
     <>
-      <KanbanBoard onDealClick={(id) => setSelectedDealId(id)} />
+      <KanbanBoard
+        onDealClick={(id) => setSelectedDealId(id)}
+        onCreateDealRequest={onCreateDealRequest}
+      />
       {selectedDealId && (
         <DealModal dealId={selectedDealId} onClose={() => setSelectedDealId(null)} />
       )}
@@ -38,19 +42,35 @@ const PipelinePage = () => {
 const AppShell = () => {
   const { fetchWorkspaces } = useStore()
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+  const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false)
+  const [newDealDraft, setNewDealDraft] = useState(null)
 
   useEffect(() => {
     fetchWorkspaces()
   }, [fetchWorkspaces])
 
+  const handleCreateDealRequest = ({ stage = 'Lead' } = {}) => {
+    setNewDealDraft({ stage, key: Date.now() })
+  }
+
+  const handleSidebarToggle = () => {
+    if (window.innerWidth >= 768) {
+      setDesktopSidebarCollapsed((prev) => !prev)
+      return
+    }
+    setMobileSidebarOpen(true)
+  }
+
   return (
-    <div className="flex h-screen bg-[#f0f4f8] text-foreground overflow-hidden">
-      <div className="hidden lg:flex">
-        <Sidebar />
-      </div>
+    <div className="flex h-screen bg-background text-foreground overflow-hidden">
+      {!desktopSidebarCollapsed ? (
+        <div className="hidden md:flex">
+          <Sidebar />
+        </div>
+      ) : null}
 
       {mobileSidebarOpen ? (
-        <div className="lg:hidden fixed inset-0 z-50">
+        <div className="md:hidden fixed inset-0 z-50">
           <button
             type="button"
             className="absolute inset-0 bg-slate-900/40"
@@ -62,15 +82,22 @@ const AppShell = () => {
           </div>
         </div>
       ) : null}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Header onMenuClick={() => setMobileSidebarOpen(true)} />
-        <main className="flex min-h-0 flex-1 flex-col overflow-hidden p-5 sm:p-6 lg:p-8">
-          <div className="mx-auto flex min-h-0 w-full max-w-[100rem] flex-1 flex-col rounded-2xl border border-slate-200/60 bg-white/80 p-4 shadow-sm shadow-slate-200/40 backdrop-blur-sm sm:p-5 overflow-y-auto no-scrollbar">
+      {/* overflow only on <main>: header dropdowns use position:absolute and must not be clipped */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <Header
+          onMenuClick={handleSidebarToggle}
+          onCreateDealRequest={handleCreateDealRequest}
+        />
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-3 sm:p-4 lg:p-6">
+          <div className="mx-auto flex min-h-0 w-full max-w-[100rem] flex-1 flex-col rounded-2xl border border-border/70 bg-card/80 p-3 shadow-sm backdrop-blur-sm sm:p-4 lg:p-5 overflow-y-auto no-scrollbar">
             <Routes>
               <Route path="/" element={<Navigate to="/pipeline" replace />} />
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/calendar" element={<CalendarPage />} />
-              <Route path="/pipeline" element={<PipelinePage />} />
+              <Route
+                path="/pipeline"
+                element={<PipelinePage onCreateDealRequest={handleCreateDealRequest} />}
+              />
               <Route path="/matters" element={<MattersPage />} />
               <Route path="/contacts" element={<ContactsPage />} />
               <Route path="/activities" element={<ActivitiesPage />} />
@@ -84,6 +111,12 @@ const AppShell = () => {
             </Routes>
           </div>
         </main>
+        <NewDealModal
+          key={newDealDraft?.key || 'new-deal-modal'}
+          isOpen={Boolean(newDealDraft)}
+          defaultStage={newDealDraft?.stage || 'Lead'}
+          onClose={() => setNewDealDraft(null)}
+        />
       </div>
     </div>
   )

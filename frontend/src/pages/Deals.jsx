@@ -1,25 +1,42 @@
 import React, { useMemo, useState } from 'react'
-import { Briefcase, Search } from 'lucide-react'
+import { Briefcase } from 'lucide-react'
 import useStore from '../store'
 import Pagination from '../components/Pagination'
+import { dealMatchesGlobalSearch, dealMatchesDealFilters } from '../utils/dealSearch'
 
 const DealsPage = () => {
-    const { deals } = useStore()
-    const [q, setQ] = useState('')
+    const {
+        deals,
+        searchTerm,
+        pipelineStageFilter,
+        pipelineAssigneeFilter,
+        pipelineAmountMin,
+        pipelineAmountMax,
+    } = useStore()
     const [page, setPage] = useState(1)
     const limit = 10
 
     const rows = useMemo(() => {
-        const term = q.trim().toLowerCase()
-        if (!term) return deals || []
-        return (deals || []).filter((d) => (d.title || '').toLowerCase().includes(term))
-    }, [deals, q])
+        const list = deals || []
+        const opts = {
+            assigneeFilter: pipelineAssigneeFilter,
+            amountMin: pipelineAmountMin,
+            amountMax: pipelineAmountMax,
+        }
+        return list.filter(
+            (d) =>
+                dealMatchesGlobalSearch(d, searchTerm) &&
+                dealMatchesDealFilters(d, opts) &&
+                (pipelineStageFilter === null || pipelineStageFilter.includes(d.stage))
+        )
+    }, [deals, searchTerm, pipelineStageFilter, pipelineAssigneeFilter, pipelineAmountMin, pipelineAmountMax])
 
     const totalPages = Math.max(Math.ceil(rows.length / limit), 1)
+    const displayPage = Math.min(Math.max(1, page), totalPages)
     const pageRows = useMemo(() => {
-        const start = (page - 1) * limit
+        const start = (displayPage - 1) * limit
         return rows.slice(start, start + limit)
-    }, [rows, page])
+    }, [rows, displayPage, limit])
 
     const money = (value) =>
         new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value || 0)
@@ -32,16 +49,9 @@ const DealsPage = () => {
                         <Briefcase size={18} />
                         All Deals
                     </h2>
-                    <p className="text-sm text-slate-500 mt-0.5">A sortable table view (connected to the same deals data)</p>
-                </div>
-                <div className="relative w-full sm:max-w-md">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={17} />
-                    <input
-                        value={q}
-                        onChange={(e) => setQ(e.target.value)}
-                        placeholder="Search deals..."
-                        className="w-full rounded-xl border border-slate-200/90 bg-slate-50/80 py-2.5 pl-10 pr-4 text-sm text-slate-800 placeholder:text-slate-400 shadow-sm outline-none transition focus:border-primary/40 focus:bg-white focus:ring-2 focus:ring-primary/15"
-                    />
+                    <p className="text-sm text-slate-500 mt-0.5">
+                        Header search plus filters: stages, assignee, and amount range.
+                    </p>
                 </div>
             </div>
 
@@ -82,10 +92,10 @@ const DealsPage = () => {
 
             {rows.length > 0 && (
                 <Pagination
-                    page={page}
+                    page={displayPage}
                     totalPages={totalPages}
-                    onPrev={() => setPage((p) => Math.max(p - 1, 1))}
-                    onNext={() => setPage((p) => Math.min(p + 1, totalPages))}
+                    onPrev={() => setPage(Math.max(displayPage - 1, 1))}
+                    onNext={() => setPage(Math.min(displayPage + 1, totalPages))}
                 />
             )}
         </div>

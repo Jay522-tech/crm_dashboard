@@ -2,7 +2,7 @@ import React from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 
-const Modal = ({ isOpen, onClose, title, children }) => {
+const Modal = ({ isOpen, onClose, title, children, maxWidthClass = 'max-w-lg' }) => {
     if (!isOpen) return null
 
     return createPortal((
@@ -15,7 +15,7 @@ const Modal = ({ isOpen, onClose, title, children }) => {
             }}
         >
             <div className="min-h-screen w-full px-4 py-10 flex items-center justify-center">
-                <div className="bg-card w-full max-w-lg rounded-2xl shadow-2xl border border-border animate-in zoom-in-95 duration-200">
+                <div className={`bg-card w-full ${maxWidthClass} rounded-2xl shadow-2xl border border-border animate-in zoom-in-95 duration-200`}>
                     <div className="flex items-center justify-between p-4 border-b border-border">
                         <h3 className="font-semibold text-lg">{title}</h3>
                         <button

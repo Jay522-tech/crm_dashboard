@@ -17,19 +17,19 @@ const ContactsTable = ({ contacts }) => {
 
     return (
         <>
-            <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-                    <p className="text-sm font-semibold text-slate-800">Directory</p>
-                    <span className="text-xs text-slate-500">{all.length} contacts</span>
+            <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+                <div className="px-4 py-3 border-b border-border/70 flex items-center justify-between">
+                    <p className="text-sm font-semibold text-foreground">Directory</p>
+                    <span className="text-xs text-muted-foreground">{all.length} contacts</span>
                 </div>
                 {all.length === 0 ? (
-                    <div className="p-10 text-center text-sm text-slate-500">
+                    <div className="p-10 text-center text-sm text-muted-foreground">
                         No contacts yet. Add a contact to get started.
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="min-w-full text-sm">
-                            <thead className="bg-slate-50 text-slate-600">
+                            <thead className="bg-muted/30 text-muted-foreground">
                                 <tr>
                                     <th className="text-left font-semibold px-4 py-3">Name</th>
                                     <th className="text-left font-semibold px-4 py-3">Company</th>
@@ -38,20 +38,20 @@ const ContactsTable = ({ contacts }) => {
                                     <th className="text-left font-semibold px-4 py-3">Tags</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100">
+                            <tbody className="divide-y divide-border/70">
                                 {rows.map((c) => (
-                                    <tr key={c._id} className="hover:bg-slate-50/60">
-                                        <td className="px-4 py-3 font-medium text-slate-900">{c.name}</td>
-                                        <td className="px-4 py-3 text-slate-600">{c.company || '—'}</td>
-                                        <td className="px-4 py-3 text-slate-600">{c.email || '—'}</td>
-                                        <td className="px-4 py-3 text-slate-600">{c.phone || '—'}</td>
+                                    <tr key={c._id} className="hover:bg-muted/30">
+                                        <td className="px-4 py-3 font-medium text-foreground">{c.name}</td>
+                                        <td className="px-4 py-3 text-muted-foreground">{c.company || '—'}</td>
+                                        <td className="px-4 py-3 text-muted-foreground">{c.email || '—'}</td>
+                                        <td className="px-4 py-3 text-muted-foreground">{c.phone || '—'}</td>
                                         <td className="px-4 py-3">
                                             {(c.tags?.length || 0) === 0 ? (
-                                                <span className="text-slate-400">—</span>
+                                                <span className="text-muted-foreground/70">—</span>
                                             ) : (
                                                 <div className="flex flex-wrap gap-1">
                                                     {c.tags.slice(0, 3).map((t) => (
-                                                        <span key={t} className="text-[11px] font-semibold rounded-full bg-slate-100 text-slate-700 px-2 py-0.5">
+                                                        <span key={t} className="text-[11px] font-semibold rounded-full bg-muted text-foreground px-2 py-0.5">
                                                             {t}
                                                         </span>
                                                     ))}
@@ -79,7 +79,7 @@ const ContactsTable = ({ contacts }) => {
 }
 
 const ContactsPage = () => {
-    const { activeWorkspaceId, contacts, fetchContacts, createContact } = useStore()
+    const { activeWorkspaceId, contacts, fetchContacts, createContact, searchTerm } = useStore()
     const [isOpen, setIsOpen] = useState(false)
     const [name, setName] = useState('')
     const [email, setEmail] = useState('')
@@ -91,15 +91,25 @@ const ContactsPage = () => {
         if (activeWorkspaceId) fetchContacts(activeWorkspaceId)
     }, [activeWorkspaceId, fetchContacts])
 
+    const filteredContacts = useMemo(() => {
+        const list = contacts || []
+        const t = (searchTerm || '').trim().toLowerCase()
+        if (!t) return list
+        return list.filter((c) => {
+            const fields = [c.name, c.email, c.phone, c.company, ...(Array.isArray(c.tags) ? c.tags : [])]
+            return fields.some((f) => f != null && String(f).toLowerCase().includes(t))
+        })
+    }, [contacts, searchTerm])
+
     return (
         <div className="flex flex-col gap-4 min-h-0">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
-                    <h2 className="text-xl font-semibold text-slate-900 flex items-center gap-2">
+                    <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
                         <Users size={18} />
                         Contacts
                     </h2>
-                    <p className="text-sm text-slate-500 mt-0.5">People and companies linked to deals</p>
+                    <p className="text-sm text-muted-foreground mt-0.5">People and companies linked to deals — filtered by the header search on this page.</p>
                 </div>
                 <button
                     type="button"
@@ -111,7 +121,7 @@ const ContactsPage = () => {
                 </button>
             </div>
 
-            <ContactsTable key={activeWorkspaceId || 'no-workspace'} contacts={contacts} />
+            <ContactsTable key={activeWorkspaceId || 'no-workspace'} contacts={filteredContacts} />
 
             <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title="New contact">
                 <form

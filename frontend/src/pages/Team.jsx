@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Users, Mail, Plus, Loader2, Sparkles } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
+import ConfirmDialog from '../components/ConfirmDialog'
 import useStore from '../store'
 import toast from 'react-hot-toast'
 
@@ -11,12 +12,20 @@ const TeamPage = () => {
         if (activeWorkspaceId) {
             fetchPendingInvitations(activeWorkspaceId)
         }
-    }, [activeWorkspaceId])
+    }, [activeWorkspaceId, fetchPendingInvitations])
     const activeWorkspace = workspaces.find((w) => w._id === activeWorkspaceId)
     const currentUserRole = activeWorkspace?.members?.find(m => String(m.user?._id || m.user) === String(user?._id))?.role
     const isAtLeastAdmin = currentUserRole === 'Super Admin' || currentUserRole === 'Admin'
     const [inviteEmail, setInviteEmail] = useState('')
     const [inviting, setInviting] = useState(false)
+    const [removeMemberPending, setRemoveMemberPending] = useState(null)
+    const getMemberInitials = (member) => {
+        const raw = member?.user?.name || member?.name || member?.user?.email || member?.email || ''
+        const parts = String(raw).trim().split(/\s+/).filter(Boolean)
+        if (parts.length === 0) return '?'
+        if (parts.length === 1) return parts[0][0]?.toUpperCase() || '?'
+        return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase()
+    }
 
     const handleInvite = async (e) => {
         e.preventDefault()
@@ -39,12 +48,38 @@ const TeamPage = () => {
         }
     }
 
+    const confirmRemoveMember = async () => {
+        if (!activeWorkspaceId || !removeMemberPending?.userId) return
+        try {
+            await removeMemberFromWorkspace(activeWorkspaceId, removeMemberPending.userId)
+            toast.success('Member removed from workspace')
+        } catch (err) {
+            toast.error(err?.response?.data?.message || 'Could not remove member')
+            throw err
+        }
+    }
+
     return (
         <div className="flex flex-col gap-6 min-h-0 overflow-y-auto">
             <PageHeader
                 title="Team Management"
                 subtitle="Manage your workspace members and invitations"
                 icon={<Users size={18} />}
+            />
+
+            <ConfirmDialog
+                isOpen={Boolean(removeMemberPending)}
+                onClose={() => setRemoveMemberPending(null)}
+                title="Remove member?"
+                message={
+                    removeMemberPending
+                        ? `Are you sure you want to remove ${removeMemberPending.name} from this workspace?`
+                        : ''
+                }
+                confirmLabel="Remove"
+                cancelLabel="Cancel"
+                danger
+                onConfirm={confirmRemoveMember}
             />
 
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -93,8 +128,8 @@ const TeamPage = () => {
                                     {activeWorkspace?.members?.map((member) => (
                                         <div key={member.user?._id || member.user} className="group flex items-center justify-between p-4 rounded-2xl border border-slate-100 bg-white hover:border-primary/20 hover:shadow-sm transition-all duration-200">
                                             <div className="flex items-center gap-4">
-                                                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-sm font-bold text-slate-600 ring-2 ring-white shadow-sm group-hover:from-primary/10 group-hover:to-primary/20 transition-all">
-                                                    {(member.user?.name || member.name)?.[0]?.toUpperCase() || '?'}
+                                                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-sky-500/20 to-indigo-500/20 flex items-center justify-center text-sm font-bold text-foreground ring-2 ring-card shadow-sm transition-all">
+                                                    {getMemberInitials(member)}
                                                 </div>
                                                 <div>
                                                     <p className="text-sm font-bold text-slate-900">{member.user?.name || member.name}</p>
@@ -113,11 +148,12 @@ const TeamPage = () => {
                                                             <option value="Member">Member</option>
                                                         </select>
                                                         <button
-                                                            onClick={() => {
-                                                                if (window.confirm(`Are you sure you want to remove ${member.user?.name || 'this member'}?`)) {
-                                                                    removeMemberFromWorkspace(activeWorkspaceId, member.user?._id || member.user)
-                                                                }
-                                                            }}
+                                                            onClick={() =>
+                                                                setRemoveMemberPending({
+                                                                    userId: member.user?._id || member.user,
+                                                                    name: member.user?.name || 'this member',
+                                                                })
+                                                            }
                                                             className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                                                             title="Remove member"
                                                         >

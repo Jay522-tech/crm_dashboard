@@ -8,6 +8,8 @@ import { STAGE_CATEGORY_LABEL, STAGE_THEME } from '../constants/kanbanConfig'
 
 const DealCard = ({ deal, onClick, isOverlay = false }) => {
     const assignee = deal.assignee
+    const assigneeName = assignee?.name || assignee?.email || ''
+    const assigneeInitial = assigneeName?.trim()?.[0]?.toUpperCase() || 'U'
     const stage = deal.stage || 'Lead'
     const theme = STAGE_THEME[stage] || STAGE_THEME.Lead
     const categoryLabel = STAGE_CATEGORY_LABEL[stage] || 'Deal'
@@ -77,19 +79,19 @@ const DealCard = ({ deal, onClick, isOverlay = false }) => {
             </p>
 
             <div className="flex items-center gap-1.5 mt-3">
-                {assignee?.name ? (
+                {assignee ? (
                     <div
-                        className="w-7 h-7 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center text-[11px] font-bold text-slate-700 ring-2 ring-white shadow-sm"
-                        title={assignee.name}
+                        className="w-7 h-7 rounded-full bg-gradient-to-br from-sky-500/20 to-indigo-500/20 flex items-center justify-center text-[11px] font-bold text-foreground ring-2 ring-card shadow-sm"
+                        title={assigneeName || 'Assigned'}
                     >
-                        {assignee.name[0]?.toUpperCase()}
+                        {assigneeInitial}
                     </div>
                 ) : (
                     <div
-                        className="w-7 h-7 rounded-full border border-dashed border-slate-300 flex items-center justify-center text-slate-400 text-xs"
+                        className="w-7 h-7 rounded-full border border-dashed border-border flex items-center justify-center text-muted-foreground text-[10px] font-semibold"
                         title="Unassigned"
                     >
-                        ?
+                        UA
                     </div>
                 )}
             </div>

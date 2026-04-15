@@ -1,6 +1,18 @@
 const express = require('express');
 const router = express.Router();
-const { createWorkspace, getWorkspaces, inviteMember, getWorkspaceDashboard, getInvitationByToken, acceptInvitation, updateMemberRole, removeMember, getPendingInvitations } = require('../controllers/workspaceController');
+const {
+    createWorkspace,
+    getWorkspaces,
+    inviteMember,
+    getWorkspaceDashboard,
+    getInvitationByToken,
+    acceptInvitation,
+    updateMemberRole,
+    removeMember,
+    getPendingInvitations,
+    updateWorkspace,
+    deleteWorkspace,
+} = require('../controllers/workspaceController');
 const { protect } = require('../middleware/authMiddleware');
 const { checkRole } = require('../middleware/permissionMiddleware');
 
@@ -15,5 +27,8 @@ router.post('/', protect, createWorkspace);
 router.post('/:id/invite', protect, checkRole(['Super Admin', 'Admin']), inviteMember);
 router.put('/:id/members/:userId/role', protect, checkRole(['Super Admin', 'Admin']), updateMemberRole);
 router.delete('/:id/members/:userId', protect, checkRole(['Super Admin', 'Admin']), removeMember);
+
+router.put('/:id', protect, updateWorkspace);
+router.delete('/:id', protect, deleteWorkspace);
 
 module.exports = router;

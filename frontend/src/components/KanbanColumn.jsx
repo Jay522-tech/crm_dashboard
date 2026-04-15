@@ -12,7 +12,7 @@ const KanbanColumn = ({ id, title, deals, onDealClick, onAddDeal, isAtLeastAdmin
     return (
         <div
             className={`
-                flex flex-col w-[min(100%,20rem)] shrink-0 h-full max-h-full rounded-xl overflow-hidden
+                flex flex-col w-[20rem] shrink-0 h-full max-h-full rounded-xl overflow-hidden
                 bg-white shadow-sm border border-slate-200/80
                 transition-shadow duration-200
                 ${isOver ? 'ring-2 ring-primary/25 shadow-md' : 'hover:shadow-md'}

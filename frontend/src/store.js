@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import toast from 'react-hot-toast';
 import api from './api';
 
 const useStore = create((set, get) => ({
@@ -25,6 +26,28 @@ const useStore = create((set, get) => ({
     searchTerm: '',
     setSearchTerm: (term) => set({ searchTerm: term }),
 
+    /** null = all stages; string[] = only those stages (may be empty = hide all) */
+    pipelineStageFilter: null,
+    setPipelineStageFilter: (stages) => set({ pipelineStageFilter: stages }),
+
+    /** null = any assignee; 'unassigned' = no owner; else workspace member user id */
+    pipelineAssigneeFilter: null,
+    setPipelineAssigneeFilter: (id) => set({ pipelineAssigneeFilter: id }),
+
+    /** Inclusive USD amount bounds; null = no bound */
+    pipelineAmountMin: null,
+    pipelineAmountMax: null,
+    setPipelineAmountMin: (n) => set({ pipelineAmountMin: n }),
+    setPipelineAmountMax: (n) => set({ pipelineAmountMax: n }),
+
+    clearAllPipelineFilters: () =>
+        set({
+            pipelineStageFilter: null,
+            pipelineAssigneeFilter: null,
+            pipelineAmountMin: null,
+            pipelineAmountMax: null,
+        }),
+
     fetchWorkspaces: async () => {
         try {
             const { data } = await api.get('/workspaces');
@@ -35,6 +58,11 @@ const useStore = create((set, get) => ({
             if (data[0]) {
                 get().fetchDeals(data[0]._id);
                 get().fetchDashboardStats(data[0]._id);
+            } else {
+                set({
+                    deals: [],
+                    dashboardStats: null,
+                });
             }
         } catch (error) {
             console.error(error);
@@ -227,15 +255,24 @@ const useStore = create((set, get) => ({
     },
 
     addDeal: async (dealData) => {
+        const workspaceId = get().activeWorkspaceId;
+        if (!workspaceId) {
+            toast.error('પહેલાં એક workspace બનાવો અથવા સાઇડબારમાંથી પસંદ કરો — deal ને workspace જોઈએ.');
+            return null;
+        }
         try {
             const { data } = await api.post('/deals', {
                 ...dealData,
-                workspaceId: get().activeWorkspaceId
+                workspaceId,
             });
             set((state) => ({ deals: [...state.deals, data] }));
             get().fetchDashboardStats();
+            return data;
         } catch (error) {
             console.error(error);
+            const msg = error?.response?.data?.message || 'Deal create failed';
+            toast.error(msg);
+            return null;
         }
     },
 
@@ -313,6 +350,8 @@ const useStore = create((set, get) => ({
             set((state) => ({ documents: state.documents.filter((d) => d._id !== documentId) }));
         } catch (error) {
             console.error(error);
+            toast.error(error?.response?.data?.message || 'Could not delete document');
+            throw error;
         }
     },
 
@@ -383,8 +422,62 @@ const useStore = create((set, get) => ({
         try {
             const { data } = await api.post('/workspaces', { name });
             set((state) => ({ workspaces: [...state.workspaces, data] }));
+            await get().setActiveWorkspace(data._id);
         } catch (error) {
             console.error(error);
+            toast.error(error?.response?.data?.message || 'Could not create workspace');
+            throw error;
+        }
+    },
+
+    refreshUser: async () => {
+        try {
+            const { data } = await api.get('/auth/me');
+            set({ user: data });
+        } catch (error) {
+            console.error(error);
+        }
+    },
+
+    updateProfile: async (payload) => {
+        const { data } = await api.put('/auth/me', payload);
+        set({ user: data });
+        return data;
+    },
+
+    /** Rename workspace (Admin / Super Admin) */
+    updateWorkspace: async (workspaceId, payload) => {
+        const { data } = await api.put(`/workspaces/${workspaceId}`, payload);
+        set((state) => ({
+            workspaces: state.workspaces.map((w) =>
+                String(w._id) === String(workspaceId) ? data : w
+            ),
+        }));
+        return data;
+    },
+
+    /** Owner or Super Admin — deletes workspace and related data server-side */
+    deleteWorkspace: async (workspaceId) => {
+        await api.delete(`/workspaces/${workspaceId}`);
+        await get().fetchWorkspaces();
+        const wid = get().activeWorkspaceId;
+        if (wid) {
+            await get().fetchDeals(wid);
+            await get().fetchDashboardStats(wid);
+            await get().fetchDocuments(wid);
+            await get().fetchTemplates(wid);
+            await get().fetchCommunicationHistory(wid);
+            await get().fetchPendingInvitations(wid);
+        } else {
+            set({
+                deals: [],
+                contacts: [],
+                dashboardStats: null,
+                documents: [],
+                templates: [],
+                communicationHistory: [],
+                pendingInvitations: [],
+            });
         }
     },
 
@@ -400,7 +493,12 @@ const useStore = create((set, get) => ({
             activities: [],
             activeWorkspaceId: null,
             dashboardStats: null,
-            dashboardLoading: false
+            dashboardLoading: false,
+            searchTerm: '',
+            pipelineStageFilter: null,
+            pipelineAssigneeFilter: null,
+            pipelineAmountMin: null,
+            pipelineAmountMax: null,
         });
     }
 }));
