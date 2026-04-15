@@ -26,7 +26,7 @@ const Modal = ({ isOpen, onClose, title, children, maxWidthClass = 'max-w-lg' })
                             <X size={20} />
                         </button>
                     </div>
-                    <div className="p-6 max-h-[75vh] overflow-auto">
+                    <div className="p-6 max-h-[90vh] overflow-auto no-scrollbar">
                         {children}
                     </div>
                 </div>

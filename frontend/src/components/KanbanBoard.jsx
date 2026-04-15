@@ -140,7 +140,7 @@ const KanbanBoard = ({ onDealClick, onCreateDealRequest }) => {
                 <div
                     ref={scrollRef}
                     onWheel={handleHorizontalWheel}
-                    className={`kanban-horizontal-scroll min-h-0 flex-1 overflow-x-auto pb-2 ${stagesToShow.length === 0 ? 'hidden' : ''}`}
+                    className={`kanban-horizontal-scroll no-scrollbar min-h-0 flex-1 overflow-x-auto pb-2 ${stagesToShow.length === 0 ? 'hidden' : ''}`}
                 >
                     <div className="flex min-h-0 min-w-max gap-5 pr-5">
                         {stagesToShow.map((stage) => (

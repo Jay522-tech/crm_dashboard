@@ -6,7 +6,6 @@ import Sidebar from './components/Sidebar'
 import KanbanBoard from './components/KanbanBoard'
 import Header from './components/Header'
 import DealModal from './components/DealModal'
-import NewDealModal from './components/NewDealModal'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import AcceptInvite from './pages/AcceptInvite'
@@ -23,19 +22,12 @@ import SettingsPage from './pages/Settings'
 import TeamPage from './pages/Team'
 import api, { clearAuthToken, setAuthToken } from './api'
 
-const PipelinePage = ({ onCreateDealRequest }) => {
-  const [selectedDealId, setSelectedDealId] = useState(null)
-
+const PipelinePage = ({ onDealClick, onCreateDealRequest }) => {
   return (
-    <>
-      <KanbanBoard
-        onDealClick={(id) => setSelectedDealId(id)}
-        onCreateDealRequest={onCreateDealRequest}
-      />
-      {selectedDealId && (
-        <DealModal dealId={selectedDealId} onClose={() => setSelectedDealId(null)} />
-      )}
-    </>
+    <KanbanBoard
+      onDealClick={onDealClick}
+      onCreateDealRequest={onCreateDealRequest}
+    />
   )
 }
 
@@ -43,14 +35,16 @@ const AppShell = () => {
   const { fetchWorkspaces } = useStore()
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false)
-  const [newDealDraft, setNewDealDraft] = useState(null)
+  const [selectedDealId, setSelectedDealId] = useState(null)
+  const [defaultStageForNew, setDefaultStageForNew] = useState('Lead')
 
   useEffect(() => {
     fetchWorkspaces()
   }, [fetchWorkspaces])
 
   const handleCreateDealRequest = ({ stage = 'Lead' } = {}) => {
-    setNewDealDraft({ stage, key: Date.now() })
+    setDefaultStageForNew(stage)
+    setSelectedDealId('new')
   }
 
   const handleSidebarToggle = () => {
@@ -96,7 +90,7 @@ const AppShell = () => {
               <Route path="/calendar" element={<CalendarPage />} />
               <Route
                 path="/pipeline"
-                element={<PipelinePage onCreateDealRequest={handleCreateDealRequest} />}
+                element={<PipelinePage onDealClick={(id) => setSelectedDealId(id)} onCreateDealRequest={handleCreateDealRequest} />}
               />
               <Route path="/matters" element={<MattersPage />} />
               <Route path="/contacts" element={<ContactsPage />} />
@@ -111,12 +105,13 @@ const AppShell = () => {
             </Routes>
           </div>
         </main>
-        <NewDealModal
-          key={newDealDraft?.key || 'new-deal-modal'}
-          isOpen={Boolean(newDealDraft)}
-          defaultStage={newDealDraft?.stage || 'Lead'}
-          onClose={() => setNewDealDraft(null)}
-        />
+        {selectedDealId && (
+          <DealModal
+            dealId={selectedDealId}
+            onClose={() => setSelectedDealId(null)}
+            defaultStage={defaultStageForNew}
+          />
+        )}
       </div>
     </div>
   )

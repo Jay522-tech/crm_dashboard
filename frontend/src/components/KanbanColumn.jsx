@@ -2,7 +2,7 @@ import React from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import DealCard from './DealCard'
-import { Plus, MoreHorizontal, CircleDot } from 'lucide-react'
+import { Plus, CircleDot } from 'lucide-react'
 import { STAGE_THEME } from '../constants/kanbanConfig'
 
 const KanbanColumn = ({ id, title, deals, onDealClick, onAddDeal, isAtLeastAdmin }) => {
@@ -46,20 +46,13 @@ const KanbanColumn = ({ id, title, deals, onDealClick, onAddDeal, isAtLeastAdmin
                             <Plus size={17} strokeWidth={2} />
                         </button>
                     )}
-                    <button
-                        type="button"
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-white/90 transition-colors"
-                        title="Column menu"
-                    >
-                        <MoreHorizontal size={17} />
-                    </button>
                 </div>
             </div>
 
             <div
                 ref={setNodeRef}
                 className={`
-                    flex-1 overflow-y-auto min-h-[120px] kanban-column px-2.5 pb-2 flex flex-col gap-2.5
+                    flex-1 overflow-y-auto no-scrollbar min-h-[120px] kanban-column px-2.5 pb-2 flex flex-col gap-2.5
                     ${theme.columnBg}
                 `}
             >
@@ -76,18 +69,20 @@ const KanbanColumn = ({ id, title, deals, onDealClick, onAddDeal, isAtLeastAdmin
                 )}
             </div>
 
-            {isAtLeastAdmin && (
-                <div className="p-2.5 pt-0 border-t border-slate-100/90 bg-white">
-                    <button
-                        type="button"
-                        onClick={onAddDeal}
-                        className="w-full py-2.5 rounded-lg text-sm font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-transparent hover:border-slate-200/80 transition-all"
-                    >
-                        + Add deal
-                    </button>
-                </div>
-            )}
-        </div>
+            {
+                isAtLeastAdmin && (
+                    <div className="p-2.5 pt-0 border-t border-slate-100/90 bg-white">
+                        <button
+                            type="button"
+                            onClick={onAddDeal}
+                            className="w-full py-2.5 rounded-lg text-sm font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-transparent hover:border-slate-200/80 transition-all"
+                        >
+                            + Add deal
+                        </button>
+                    </div>
+                )
+            }
+        </div >
     )
 }
 

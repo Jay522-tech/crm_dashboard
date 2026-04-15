@@ -58,7 +58,7 @@ const Sidebar = ({ onNavigate }) => {
                 </div>
             </div>
 
-            <nav className="flex-1 overflow-y-auto px-3 pb-4 space-y-6">
+            <nav className="flex-1 overflow-y-auto no-scrollbar px-3 pb-4 space-y-6">
                 <div>
                     <h3 className="px-3 text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">
                         Main
