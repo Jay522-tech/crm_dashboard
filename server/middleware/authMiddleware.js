@@ -3,22 +3,33 @@ const User = require('../models/User');
 const Workspace = require('../models/Workspace');
 
 const protect = async (req, res, next) => {
-    let token = req.cookies?.token;
+    let token;
 
-    if (!token && req.headers.authorization?.startsWith('Bearer ')) {
+    // 1. Check Authorization Header (Bearer Token) - Priority
+    if (req.headers.authorization?.startsWith('Bearer ')) {
         token = req.headers.authorization.split(' ')[1];
     }
+    // 2. Check Browser Cookies
+    else if (req.cookies?.token) {
+        token = req.cookies.token;
+    }
 
-    if (token) {
-        try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret123');
-            req.user = await User.findById(decoded.id).select('-password');
-            next();
-        } catch (error) {
-            res.status(401).json({ message: 'Not authorized, token failed' });
+    if (!token) {
+        return res.status(401).json({ message: 'Not authorized, no token' });
+    }
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret123');
+        req.user = await User.findById(decoded.id).select('-password');
+
+        if (!req.user) {
+            return res.status(401).json({ message: 'Not authorized, user not found' });
         }
-    } else {
-        res.status(401).json({ message: 'Not authorized, no token' });
+
+        next();
+    } catch (error) {
+        console.error('Auth Error:', error.message);
+        res.status(401).json({ message: 'Not authorized, token failed' });
     }
 };
 

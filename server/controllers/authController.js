@@ -14,6 +14,7 @@ const getCookieOptions = () => {
         sameSite: isProduction ? 'none' : 'lax',
         secure: isProduction,
         maxAge: 30 * 24 * 60 * 60 * 1000,
+        path: '/',
     };
 };
 
@@ -91,8 +92,23 @@ exports.logout = (req, res) => {
 };
 
 exports.getMe = async (req, res) => {
-    const user = await User.findById(req.user.id).select('-password');
-    res.json(user);
+    try {
+        const user = await User.findById(req.user.id).select('-password');
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        // Generate a fresh token so frontend can keep localStorage in sync
+        const token = generateToken(user._id);
+
+        res.json({
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            workspaces: user.workspaces,
+            token
+        });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
 };
 
 exports.updateMe = async (req, res) => {
