@@ -14,11 +14,29 @@ const app = express();
 // Middleware
 app.use(express.json());
 app.use(cookieParser());
-const frontendOrigin = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
+const allowedOrigins = (process.env.FRONTEND_ORIGIN )
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+const isAllowedOrigin = (origin) => {
+    if (!origin) return true; // Non-browser clients (curl/postman)
+    if (allowedOrigins.includes(origin)) return true;
+
+    // Allow all Vercel preview/prod domains when explicitly configured.
+    // Example env value: https://*.vercel.app
+    return allowedOrigins.some((allowedOrigin) => {
+        if (!allowedOrigin.includes('*')) return false;
+        const pattern = new RegExp(`^${allowedOrigin.replace(/\./g, '\\.').replace(/\*/g, '.*')}$`);
+        return pattern.test(origin);
+    });
+};
+
 app.use(cors({
-    origin: frontendOrigin.includes(',')
-        ? frontendOrigin.split(',').map((o) => o.trim())
-        : frontendOrigin,
+    origin: (origin, callback) => {
+        if (isAllowedOrigin(origin)) return callback(null, true);
+        return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
     credentials: true
 }));
 app.use(morgan('dev'));
