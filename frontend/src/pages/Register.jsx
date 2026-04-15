@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
-import api from '../api';
+import api, { setAuthToken } from '../api';
 import toast from 'react-hot-toast';
 import useStore from '../store';
 
@@ -26,6 +26,7 @@ const Register = () => {
         e.preventDefault();
         try {
             const { data } = await api.post('/auth/register', { name, email, password, inviteToken: inviteToken || undefined });
+            setAuthToken(data?.token);
             setUser(data);
             toast.success('Account created successfully!');
             navigate(nextPath);

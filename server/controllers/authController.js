@@ -63,7 +63,7 @@ exports.register = async (req, res) => {
         const token = generateToken(user._id);
 
         res.cookie('token', token, getCookieOptions());
-        res.status(201).json({ id: user._id, name: user.name, email: user.email });
+        res.status(201).json({ id: user._id, name: user.name, email: user.email, token });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -76,7 +76,7 @@ exports.login = async (req, res) => {
         if (user && (await user.comparePassword(password))) {
             const token = generateToken(user._id);
             res.cookie('token', token, getCookieOptions());
-            res.json({ id: user._id, name: user.name, email: user.email });
+            res.json({ id: user._id, name: user.name, email: user.email, token });
         } else {
             res.status(401).json({ message: 'Invalid email or password' });
         }

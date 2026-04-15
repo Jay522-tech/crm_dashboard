@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
-import api from '../api';
+import api, { setAuthToken } from '../api';
 import toast from 'react-hot-toast';
 import useStore from '../store';
 
@@ -20,6 +20,7 @@ const Login = () => {
         e.preventDefault();
         try {
             const { data } = await api.post('/auth/login', { email, password });
+            setAuthToken(data?.token);
             setUser(data);
             toast.success('Logged in successfully!');
             navigate(nextPath);

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import toast from 'react-hot-toast';
-import api from './api';
+import api, { clearAuthToken } from './api';
 
 const useStore = create((set, get) => ({
     user: null,
@@ -483,6 +483,7 @@ const useStore = create((set, get) => ({
 
     logout: async () => {
         await api.post('/auth/logout');
+        clearAuthToken();
         set({
             user: null,
             workspaces: [],

@@ -21,7 +21,7 @@ import CommunicationsPage from './pages/Communications'
 import ReportsPage from './pages/Reports'
 import SettingsPage from './pages/Settings'
 import TeamPage from './pages/Team'
-import api from './api'
+import api, { clearAuthToken } from './api'
 
 const PipelinePage = ({ onCreateDealRequest }) => {
   const [selectedDealId, setSelectedDealId] = useState(null)
@@ -132,6 +132,7 @@ function App() {
         const { data } = await api.get('/auth/me')
         setUser(data)
       } catch {
+        clearAuthToken()
         setUser(null)
       } finally {
         setLoading(false)
