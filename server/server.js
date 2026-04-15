@@ -39,8 +39,18 @@ const isAllowedOrigin = (origin) => {
 
 app.use(cors({
     origin: (origin, callback) => {
-        if (isAllowedOrigin(origin)) return callback(null, true);
-        return callback(new Error(`CORS blocked for origin: ${origin}`));
+        // Allow if no origin (like mobile apps or curl) or if it's in our allowed list
+        if (!origin || isAllowedOrigin(origin)) {
+            return callback(null, true);
+        }
+
+        // Dynamic check for Vercel preview/branch deployments
+        if (origin.endsWith('.vercel.app') && origin.includes('crm-dashboard')) {
+            return callback(null, true);
+        }
+
+        // Instead of returning an Error, we return null, false to block it gracefully
+        return callback(null, false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
