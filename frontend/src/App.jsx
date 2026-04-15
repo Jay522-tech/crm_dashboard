@@ -70,14 +70,14 @@ const AppShell = () => {
       ) : null}
 
       {mobileSidebarOpen ? (
-        <div className="md:hidden fixed inset-0 z-50">
+        <div className="md:hidden fixed inset-0 z-[1000]">
           <button
             type="button"
             className="absolute inset-0 bg-slate-900/40"
             aria-label="Close sidebar"
             onClick={() => setMobileSidebarOpen(false)}
           />
-          <div className="absolute left-0 top-0 bottom-0 w-[17rem] max-w-[85vw]">
+          <div className="absolute left-0 top-0 bottom-0 w-[17rem] max-w-[85vw] h-full">
             <Sidebar onNavigate={() => setMobileSidebarOpen(false)} />
           </div>
         </div>

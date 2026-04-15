@@ -43,7 +43,7 @@ const Sidebar = ({ onNavigate }) => {
     }
 
     return (
-        <div className="w-[14.5rem] lg:w-[17rem] shrink-0 border-r border-border bg-card flex flex-col shadow-[4px_0_24px_-12px_rgba(15,23,42,0.08)]">
+        <div className="h-full w-[14.5rem] lg:w-[17rem] shrink-0 border-r border-border bg-card flex flex-col shadow-[4px_0_24px_-12px_rgba(15,23,42,0.08)]">
             <div className="p-5 pb-4">
                 <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-blue-600 text-white shadow-md shadow-primary/25">

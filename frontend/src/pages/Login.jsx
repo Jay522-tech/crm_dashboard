@@ -3,6 +3,7 @@ import { useLocation, useNavigate, Link } from 'react-router-dom';
 import api, { setAuthToken } from '../api';
 import toast from 'react-hot-toast';
 import useStore from '../store';
+import { setTheme } from '../lib/theme';
 
 const Login = () => {
     const [email, setEmail] = useState('');
@@ -22,6 +23,7 @@ const Login = () => {
             const { data } = await api.post('/auth/login', { email, password });
             setAuthToken(data?.token);
             setUser(data);
+            setTheme('light'); // Set default light mode on login
             toast.success('Logged in successfully!');
             navigate(nextPath);
         } catch (error) {

@@ -3,6 +3,7 @@ import { useLocation, useNavigate, Link } from 'react-router-dom';
 import api, { setAuthToken } from '../api';
 import toast from 'react-hot-toast';
 import useStore from '../store';
+import { setTheme } from '../lib/theme';
 
 const Register = () => {
     const [name, setName] = useState('');
@@ -28,6 +29,7 @@ const Register = () => {
             const { data } = await api.post('/auth/register', { name, email, password, inviteToken: inviteToken || undefined });
             setAuthToken(data?.token);
             setUser(data);
+            setTheme('light'); // Set default light mode on register
             toast.success('Account created successfully!');
             navigate(nextPath);
         } catch (error) {
