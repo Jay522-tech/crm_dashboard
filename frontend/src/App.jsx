@@ -21,7 +21,7 @@ import CommunicationsPage from './pages/Communications'
 import ReportsPage from './pages/Reports'
 import SettingsPage from './pages/Settings'
 import TeamPage from './pages/Team'
-import api, { clearAuthToken } from './api'
+import api, { clearAuthToken, setAuthToken } from './api'
 
 const PipelinePage = ({ onCreateDealRequest }) => {
   const [selectedDealId, setSelectedDealId] = useState(null)
